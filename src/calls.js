@@ -1,3 +1,5 @@
+const Vector = require('./vector');
+
 function pop(hostname, vectors) {
 	vectors.pop();
 	return this.pop();
@@ -5,7 +7,7 @@ function pop(hostname, vectors) {
 
 function push(hostname, vectors, ... args) {
 	for (let _ of args) {
-		vectors.push( [ 0, hostname ] );
+		vectors.push(Vector.create(hostname));
 	}
 	
 	return this.push(... args);
@@ -13,7 +15,7 @@ function push(hostname, vectors, ... args) {
 
 function reverse(hostname, vectors) {
 	for (let [i, vector] of Object.entries(vectors)) {
-		vectors[i] = [ vector[0] + 1, hostname ];
+		vectors[i] = Vector.increment(vector, hostname);
 	}
 
 	return this.reverse();
@@ -25,7 +27,7 @@ function shift(hostname, vectors) {
 	vectors.shift();
 
 	for (let [i, vector] of Object.entries(vectors)) {
-		vectors[i] = [ vector[0] + 1, hostname ];
+		vectors[i] = Vector.increment(vector, hostname);
 	}
 
 	return ret;
@@ -35,11 +37,11 @@ function unshift(hostname, vectors, ... args) {
 	const ret = this.unshift(... args);
 
 	for (let [i, vector] of Object.entries(vectors)) {
-		vectors[i] = [ vector[0] + 1, hostname ];
+		vectors[i] = Vector.increment(vector, hostname);
 	}
 
 	while (vectors.length < this.length) {
-		vectors.push([0, hostname]);
+		vectors.push(Vector.create(hostname));
 	}
 	
 	return ret;
@@ -50,11 +52,11 @@ function splice(hostname, vectors, start, count, ... items) {
 
 	// Increment shifted items
 	for (let i = start; i < vectors.length; i++) {
-		vectors[start] = [ vectors[start][0] + 1, hostname ];
+		vectors[start] = Vector.increment(vectors[start], hostname);
 	}
 
 	while (vectors.length < this.length) {
-		vectors.push([0, hostname]);
+		vectors.push(Vector.create(hostname));
 	}
 
 	return ret;
@@ -71,7 +73,7 @@ function fill(hostname, vectors, value, start, end) {
 	for (let i = start; i < end; i++) {
 		if (i >= vectors.length) break ;
 
-		vectors[i] = [ vectors[i][0] + 1, hostname ];
+		vectors[i] = Vector.increment(vectors[i], hostname);
 	}
 
 	return this.fill(value, start, end);
@@ -87,7 +89,7 @@ function copyWithin(hostname, vectors, target, start, end) {
 	for (let length = end - start, index = target; length > 0; length--, index++) {
 		if (target >= vectors.length) break ;
 
-		vectors[index] = [ vectors[index][0] + 1, hostname ];
+		vectors[index] = Vector.increment(vectors[index], hostname);
 	}
 
 	return this.copyWithin(target, start, end);

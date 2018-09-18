@@ -1,16 +1,10 @@
 const EventEmitter = require("events");
 
+const Vector = require('./vector');
 const { clone, guid } = require('./util');
 const { CallFunctions, CallNames } = require('./calls');
 
 const GC_TIME = 100;
-
-function compare_vectors(a, b) {
-	if (!a) return true;
-	if (a[0] < b[0]) return true;
-	if (a[1] < b[1]) return true;
-	return false;
-}
 
 class Facsimile extends EventEmitter {
 	constructor(hostname) {
@@ -23,6 +17,8 @@ class Facsimile extends EventEmitter {
 		this._proxy = new WeakMap();	// Proxy collection
 		this._objects = {};				// Would like a WeakValueMap here
 		this._pending = {};				// Waiting for state (lazy refs)
+		this._locks	= new WeakMap();	// Active semaphor locks
+
 		this._pending_count = 0;		// Number of waiting states
 		this._batch_refs = null;		// References per transmission we need to batch
 	}
@@ -160,7 +156,7 @@ class Facsimile extends EventEmitter {
 		this._vectors.set(object, vectors);
 
 		for (let [key, value] of Object.entries(object)) {
-			vectors[key] = [ 0, hostname ];
+			vectors[key] = Vector.create(hostname);
 		}
 	}
 
@@ -194,9 +190,9 @@ class Facsimile extends EventEmitter {
 		let vector = vectors[property];
 
 		if (vector === undefined) {
-			vector = [ 0, this._hostname ];
+			vector = Vector.create(this._hostname);
 		} else {
-			vector = [ vector[0] + 1, this._hostname ];
+			vector = Vector.increment(vector, this._hostname);
 		}
 
 		vectors[property] = vector;
@@ -289,7 +285,7 @@ class Facsimile extends EventEmitter {
 		const vectors = this._vectors.get(object);
 		const vector_a = vectors[property];
 
-		if (!compare_vectors(vector_a, vector_b)) return ;
+		if (!Vector.compare(vector_a, vector_b)) return ;
 
 		const proxy = this._proxy.get(object);
 
@@ -310,7 +306,7 @@ class Facsimile extends EventEmitter {
 		const vectors = this._vectors.get(object);
 		const vector_a = vectors[property];
 
-		if (!compare_vectors(vector_a, vector_b)) return ;
+		if (!Vector.compare(vector_a, vector_b)) return ;
 
 		vectors[property] = vector_b;
 
@@ -426,7 +422,7 @@ class Facsimile extends EventEmitter {
 		}
 
 		for (let [key, value] of Object.entries(values)) {
-			if (!compare_vectors(vectors[key], vector)) continue;
+			if (!Vector.compare(vectors[key], vector)) continue;
 
 			this._dereference(target, key, value);
 			vectors[key] = vector;

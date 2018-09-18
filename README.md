@@ -139,5 +139,4 @@ b.sync();
 
 ### Contact
 
-Twitter: [@asterick](https://twitter.com/asterick)
-GitHub: [@asterick](https://github.com/asterick)
+**@asterick**: [Twitter](https://twitter.com/asterick) [GitHub](https://github.com/asterick)

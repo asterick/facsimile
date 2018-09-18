@@ -67,7 +67,7 @@ reference types, and will not monitor changes in contained objects.
 
 ### Facsimile.store.\*.off([property:string], cb:function)
 
-Destroy an event listener created with `Facsimile.store.\*.on`
+Destroy an event listener created with `Facsimile.store.*.on`
 
 ## Notes up communication
 

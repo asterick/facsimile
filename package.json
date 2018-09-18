@@ -1,6 +1,6 @@
 {
-  "name": "doppel",
-  "version": "1.0.0",
+  "name": "facsimile",
+  "version": "0.1.0",
   "description": "Transparent object mirroring over RPC",
   "main": "src/index.js",
   "directories": {
@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/asterick/doppel.git"
+    "url": "git+https://github.com/asterick/facsimile.git"
   },
   "keywords": [
     "proxy",
@@ -19,9 +19,9 @@
     "storage"
   ],
   "author": "Bryon Vandiver",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/asterick/doppel/issues"
+    "url": "https://github.com/asterick/facsimile/issues"
   },
-  "homepage": "https://github.com/asterick/doppel#readme"
+  "homepage": "https://github.com/asterick/facsimile#readme"
 }

@@ -64,7 +64,7 @@ class Facsimile extends EventEmitter {
 			this.emit('root_changed');
 			break ;
 		case 'export':
-			this._export(payload.references);
+			this._export(payload.hostname, payload.references);
 			break ;
 		case 'import':
 			this._import(payload.members, payload.vectors);
@@ -111,7 +111,7 @@ class Facsimile extends EventEmitter {
 			const references = this._batch_refs;
 			this._batch_refs = null;
 
-			this.send('export', { references });
+			this.send('export', { hostname: this._hostname, references });
 		}
 	}
 
@@ -222,6 +222,17 @@ class Facsimile extends EventEmitter {
 		}
 	}
 
+	_defined(value) {
+		if (Array.isArray(value)) {
+			const [ ref ] = value;
+
+			// This is a safe value to resolve
+			return this._objects[ref] !== undefined;
+		}
+
+		return true;
+	}
+
 	_dereference(object, key, value) {
 		if (Array.isArray(value)) {
 			const [ ref ] = value;
@@ -230,15 +241,13 @@ class Facsimile extends EventEmitter {
 			if (this._objects[ref] === undefined) {
 				delete object[key];
 				this._lazy_ref(ref, object, key);
-				return true;
+				return ;
 			}
 
 			object[key] = this._objects[ref];
 		} else {
 			object[key] = value;
 		}
-
-		return false;
 	}
 
 	_reference (value) {
@@ -357,12 +366,15 @@ class Facsimile extends EventEmitter {
 		}
 	}
 
-	_export(references) {
+	_export(hostname, references) {
 		const members = {};
 		const vectors = {};
 
 		for (let id of references) {
 			const object = this._objects[id];
+
+			if (object === undefined) continue ;
+
 			const out_vect = new (Object.getPrototypeOf(object).constructor);
 			const in_vect = this._vectors.get(object);
 
@@ -374,7 +386,7 @@ class Facsimile extends EventEmitter {
 			}
 		}
 
-		this.send('import', { members, vectors });
+		this.send('import', { hostname, members, vectors });
 	}
 
 	_sync() {
@@ -384,19 +396,18 @@ class Facsimile extends EventEmitter {
 	_call(id, name, host, parameters) {
 		const target = this._objects[id];
 		const proxy = this._proxy.get(target);
-		const bypass = CallNames[name];
 
-		let lazy = false;
 		for (let [key, value] of Object.entries(parameters)) {
-			lazy = this._dereference(parameters, key, value) || lazy;
+			if (!this._defined(value)) {
+				_lazy_ref(id);
+				return ;
+			}
+
+			this._dereference(parameters, key, value);
 		}
 
-		if (lazy) {
-			_lazy_ref(id);
-			return ;
-		}
-
-		bypass.funct.call(target, host, this._vectors.get(target), ... parameters);
+		const funct = CallNames[name].bypass;
+		funct.call(target, host, this._vectors.get(target), ... parameters);
 
 		this.emit(`change`, proxy);
 		this.emit(`change;${id}`, proxy);
@@ -458,15 +469,28 @@ class Facsimile extends EventEmitter {
 
 		case 'function':
 			{
-				const bypass = CallFunctions.get(target[property]);
+				const funct = CallFunctions.get(target[property]);
 
-				if (!bypass) return target[property];
+				if (!funct) return target[property];
 
-				switch (bypass.type) {
-				case 'replace':
+				if (funct.bypass) {
 					return (... args) => {
 						const id = this._id.get(target);
-						const ret = bypass.prototype.apply(target, args);
+						const parameters = this._flatten(args);
+						const ret = funct.bypass.call(target, this._hostname, this._vectors.get(target), ... args);
+						const name = funct.name;
+
+						this.emit(`change`, proxy);
+						this.emit(`change;${id}`, proxy);
+
+						this.send('call', { id, name, host: this._hostname, parameters });
+
+						return ret;
+					}
+				} else {
+					return (... args) => {
+						const id = this._id.get(target);
+						const ret = funct.prototype.apply(target, args);
 						const values = this._flatten(target);
 						const vectors = this._vectors.get(target);
 						const weight = vectors.reduce((acc, vec) => Math.max(acc, vec[0]), 0) + 1;
@@ -483,22 +507,6 @@ class Facsimile extends EventEmitter {
 
 						return ret;
 					}
-					break ;
-				case 'inplace':
-					return (... args) => {
-						const id = this._id.get(target);
-						const parameters = this._flatten(args);
-						const ret = bypass.funct.call(target, this._hostname, this._vectors.get(target), ... args);
-						const name = bypass.name;
-
-						this.emit(`change`, proxy);
-						this.emit(`change;${id}`, proxy);
-
-						this.send('call', { id, name, host: this._hostname, parameters });
-
-						return ret;
-					}
-					break ;
 				}
 			}
 

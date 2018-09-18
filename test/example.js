@@ -46,6 +46,8 @@ b.on('ready', () => {
 
 	b.store.elements[0] = 999;
 	b.store.elements[1] = 888;
+	a.store.elements.unshift(4);
+	a.store.elements.sort((a, b) => (a - b));
 });
 
 b.sync();

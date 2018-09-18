@@ -1,7 +1,8 @@
 const EventEmitter = require("events");
 
 const Vector = require('./vector');
-const { clone, guid } = require('./util');
+const Locks = require('./locks');
+const guid = require('./guid');
 const { CallFunctions, CallNames } = require('./calls');
 
 const GC_TIME = 100;
@@ -17,7 +18,7 @@ class Facsimile extends EventEmitter {
 		this._proxy = new WeakMap();	// Proxy collection
 		this._objects = {};				// Would like a WeakValueMap here
 		this._pending = {};				// Waiting for state (lazy refs)
-		this._locks	= new WeakMap();	// Active semaphor locks
+		this._locks	= new Locks(this);	// Active semaphor locks
 
 		this._pending_count = 0;		// Number of waiting states
 		this._batch_refs = null;		// References per transmission we need to batch
@@ -51,6 +52,15 @@ class Facsimile extends EventEmitter {
 
 	receive(message, payload) {
 		switch (message) {
+		case 'lock:req':
+			this._locks.request(payload);
+			break ;
+		case 'lock:ack':
+			this._locks.acknowledge(payload);
+			break ;
+		case 'lock:unlock':
+			this._locks.unlock(payload);
+			break ;
 		case 'sync':
 			this._sync();
 			break ;
@@ -430,6 +440,15 @@ class Facsimile extends EventEmitter {
 	get (target, property, proxy) {
 		// Injected calls
 		switch (property) {
+		case 'lock':
+			return _ => this._locks.create(target);
+
+		case 'available':
+			return this._locks.await(target);
+
+		case 'release':
+			return _ => this._locks.release(target);
+
 		case 'on':
 			return (prop, cb) => {
 				const ref = this._id.get(target);
@@ -439,7 +458,8 @@ class Facsimile extends EventEmitter {
 				} else {
 					this.on(`change;${ref};${prop}`, cb);
 				}
-			};
+			}
+
 		case 'off':
 			return (prop, cb) => {
 				const ref = this._id.get(target);
@@ -449,7 +469,7 @@ class Facsimile extends EventEmitter {
 				} else {
 					this.off(`change;${ref};${prop}`, cb);
 				}
-			};
+			}
 		}
 
 		// Overlay
@@ -534,9 +554,9 @@ class Facsimile extends EventEmitter {
 
 		if (typeof target[property] === 'object') this._schedule_gc();
 
-		// This object has a lock, 
-		if (this._locks.has(target)) {
-			throw this._locks.get(target);
+		// Determine if object is locked, and owned by current host
+		if (!this._locks.owns(target)) {
+			throw new Error("Object is not owned by current host");
 		}
 
 		// Signal this property has changed

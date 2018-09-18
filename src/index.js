@@ -372,6 +372,9 @@ class Facsimile extends EventEmitter {
 
 		for (let id of references) {
 			const object = this._objects[id];
+
+			if (object === undefined) continue ;
+
 			const out_vect = new (Object.getPrototypeOf(object).constructor);
 			const in_vect = this._vectors.get(object);
 

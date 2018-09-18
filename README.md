@@ -69,16 +69,16 @@ reference types, and will not monitor changes in contained objects.
 
 Destroy an event listener created with `Facsimile.store.*.on`
 
-## Notes up communication
+## Notes on communication
 
 Facsimile instances do not natively support any signalling between the various modules.
 You must supply a tunnel between the instances, and all messages sent from one 
 node must be sent to all other nodes in the system.
 
 Caveats:
-* Messages sent from a node must be sent in order.
+* Messages sent from a node must be relayed in order.
 * How messages are interleaved between multiple nodes does not matter
-* Messages are committed in 'Last-Written' priority
+* Messages are committed in 'Last Written' priority
 * If the system cannot determine who wrote last, the host with the lowest 'hostname' wins
 
 ## Basic local example
@@ -141,4 +141,4 @@ Known Issues
 ------------
 
 * Syncing all instances at the same time will cause a deadlock
-* Properties cause desyncronization
+* Properties may cause desyncronization

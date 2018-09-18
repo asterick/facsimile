@@ -458,15 +458,27 @@ class Facsimile extends EventEmitter {
 
 		case 'function':
 			{
-				const bypass = CallFunctions.get(target[property]);
+				const funct = CallFunctions.get(target[property]);
 
-				if (!bypass) return target[property];
+				if (!funct) return target[property];
 
-				switch (bypass.type) {
-				case 'replace':
+				if (funct.bypass) {
 					return (... args) => {
 						const id = this._id.get(target);
-						const ret = bypass.prototype.apply(target, args);
+						const parameters = this._flatten(args);
+						const ret = funct.bypass.call(target, this._hostname, this._vectors.get(target), ... args);
+						const name = funct.name;
+
+						this.emit(`change`, proxy);
+						this.emit(`change;${id}`, proxy);
+
+						this.send('call', { id, name, host: this._hostname, parameters });
+
+						return ret;
+					}				} else {
+					return (... args) => {
+						const id = this._id.get(target);
+						const ret = funct.prototype.apply(target, args);
 						const values = this._flatten(target);
 						const vectors = this._vectors.get(target);
 						const weight = vectors.reduce((acc, vec) => Math.max(acc, vec[0]), 0) + 1;
@@ -483,22 +495,6 @@ class Facsimile extends EventEmitter {
 
 						return ret;
 					}
-					break ;
-				case 'inplace':
-					return (... args) => {
-						const id = this._id.get(target);
-						const parameters = this._flatten(args);
-						const ret = bypass.funct.call(target, this._hostname, this._vectors.get(target), ... args);
-						const name = bypass.name;
-
-						this.emit(`change`, proxy);
-						this.emit(`change;${id}`, proxy);
-
-						this.send('call', { id, name, host: this._hostname, parameters });
-
-						return ret;
-					}
-					break ;
 				}
 			}
 

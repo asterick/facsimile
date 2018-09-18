@@ -94,17 +94,17 @@ function copyWithin(hostname, vectors, target, start, end) {
 }
 
 const CallNames = {
-	array_copyWithin: { type: 'inplace', prototype: Array.prototype.copyWithin, funct: copyWithin },
-	array_fill: { type: 'inplace', prototype: Array.prototype.fill, funct: fill },
-	array_pop: { type: 'inplace', prototype: Array.prototype.pop, funct: pop },
-	array_push: { type: 'inplace', prototype: Array.prototype.push, funct: push },
-	array_reverse: { type: 'inplace', prototype: Array.prototype.reverse, funct: reverse },
-	array_shift: { type: 'inplace', prototype: Array.prototype.shift, funct: shift },
-	array_splice: { type: 'inplace', prototype: Array.prototype.splice, funct: splice },
-	array_unshift: { type: 'inplace', prototype: Array.prototype.unshift, funct: unshift },
+	array_copyWithin: { prototype: Array.prototype.copyWithin, bypass: copyWithin },
+	array_fill: { prototype: Array.prototype.fill, bypass: fill },
+	array_pop: { prototype: Array.prototype.pop, bypass: pop },
+	array_push: { prototype: Array.prototype.push, bypass: push },
+	array_reverse: { prototype: Array.prototype.reverse, bypass: reverse },
+	array_shift: { prototype: Array.prototype.shift, bypass: shift },
+	array_splice: { prototype: Array.prototype.splice, bypass: splice },
+	array_unshift: { prototype: Array.prototype.unshift, bypass: unshift },
 	
 	// Heavy weight functions that cannot be safely serialized, so inplace is taken as is
-	array_sort: { type: 'replace', prototype: Array.prototype.sort },
+	array_sort: { prototype: Array.prototype.sort },
 }
 
 const CallFunctions = new WeakMap();

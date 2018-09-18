@@ -41,13 +41,41 @@ b.on('root_changed', () => {
 	console.log("Root element has changed.");
 });
 
-b.on('ready', () => {
-	console.log("elements =", b.store.elements);
+async function arrayFunctions() {
+	const array = b.store.elements;
+
+	console.log("Locking")
+	await array.lock();
+	console.log("Locked")
+
+	console.log("Trying to create a dead lock");
+	try {
+		await b.store.elements.lock();	// This will fail because A owns the lock
+	} catch (e) {
+		console.log(e);
+	}
 
 	b.store.elements[0] = 999;
 	b.store.elements[1] = 888;
-	a.store.elements.unshift(4);
-	a.store.elements.sort((a, b) => (a - b));
+	b.store.elements.unshift(4);
+	b.store.elements.sort((a, b) => (a - b));
+
+	console.log("Unlocking");
+	array.release();
+
+	console.log("Waiting for unlock");
+	await a.store.elements.available;
+
+	console.log("Locking")
+	await a.store.elements.lock();
+	console.log("Unlocking")
+	a.store.elements[2] = 123;
+	a.store.elements.release();
+}
+
+b.on('ready', () => {
+	console.log("elements =", b.store.elements);
+	arrayFunctions()
 });
 
 b.sync();

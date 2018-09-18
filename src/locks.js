@@ -14,13 +14,17 @@ class Locks {
 		this._locks = new WeakMap();
 	}
 
+	locked (target) {
+		return this._locks.has(target);
+	}
+
 	owns(target) {
 		const lock = this._locks.get(target);
 
 		// Unowned
 		if (!lock) return true;
 
-		return lock.hostname === this._node._hostname;
+		return lock.fixed && lock.hostname === this._node._hostname;
 	}
 
 	_lock(hostname) {

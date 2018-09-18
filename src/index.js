@@ -483,7 +483,11 @@ class Facsimile extends EventEmitter {
 
 				if (!funct) return target[property];
 
-				if (funct.bypass) {
+				if (!this._locks.owns(target)) {
+					throw new Error("Object is locked");
+				}
+
+				if (funct.bypass && this._locks.locked(target)) {
 					return (... args) => {
 						const id = this._id.get(target);
 						const parameters = this._flatten(args);

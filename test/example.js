@@ -27,23 +27,25 @@ const a = new Facsimile("host");
 network.add(a);
 a.store = { elements: [1, 2, 3] };
 
-a.store.elements.on(0, (target, property) => {
-	console.log(`Index[0] = ${target[property]}`);
+a.store.elements.on(0, (target, property, new_value) => {
+	console.log(`Index[0] = ${new_value}`);
 });
-a.store.elements.on((target, property) => {
-	console.log(`Index[${property}] = ${target[property]}`);
+a.store.elements.on((target, property, new_value) => {
+	console.log(`Index[${property}] = ${new_value}`);
 });
 
 // Create a subnode, and syncronize them
 const b = new Facsimile("client");
 network.add(b);
-b.sync();
-
-b.on('ready', () => {
-	console.log(b.store.elements);
-
-	b.store.elements[0] = 999;
+b.on('root_changed', () => {
+	console.log("Root element has changed.");
 });
 
+b.on('ready', () => {
+	console.log("elements =", b.store.elements);
 
-console.log(b.listeners('ready'))
+	b.store.elements[0] = 999;
+	b.store.elements[1] = 888;
+});
+
+b.sync();

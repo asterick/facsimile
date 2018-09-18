@@ -52,20 +52,20 @@ A node has redefined the global scope object
 Creates a listener that will fire any time all known lazy references have been resolved.
 IE: when a `.sync()` command has completed.
 
-### Facsimile.on('change', function(target:object, property:string))
+### Facsimile.on('change', function(target:object, property:string, \[new:\*\],  \[old:\*\]))
 
 An instance contained inside of the Facsimile store has changed
 
 **NOTE: Property may be undefined if mass object change occured**
 
-### Facsimile.store.\*.on([property:string], function(target:object, property:string))
+### Facsimile.store.\*.on([property:string], cb:function(target:object, property:string, \[new:\*\],  \[old:\*\]))
 
 Monitor changes on a reference type in a `Facsimile.store`.  Can only be attached to
 reference types, and will not monitor changes in contained objects.
 
 **NOTE: Property may be undefined if mass object change occured**
 
-### Facsimile.store.\*.off([property:string], function(target:object, property:string))
+### Facsimile.store.\*.off([property:string], cb:function)
 
 Destroy an event listener created with `Facsimile.store.\*.on`
 
@@ -113,14 +113,28 @@ const a = new Facsimile("host");
 network.add(a);
 a.store = { elements: [1, 2, 3] };
 
+a.store.elements.on(0, (target, property, new_value) => {
+	console.log(`Index[0] = ${new_value}`);
+});
+a.store.elements.on((target, property, new_value) => {
+	console.log(`Index[${property}] = ${new_value}`);
+});
+
 // Create a subnode, and syncronize them
 const b = new Facsimile("client");
 network.add(b);
-b.sync();
+b.on('root_changed', () => {
+	console.log("Root element has changed.");
+});
 
 b.on('ready', () => {
-	console.log(b.store.elements);
+	console.log("elements =", b.store.elements);
+
+	b.store.elements[0] = 999;
+	b.store.elements[1] = 888;
 });
+
+b.sync();
 ```
 
 Known Issues

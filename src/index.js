@@ -286,9 +286,9 @@ class Facsimile extends EventEmitter {
 
 		delete object[property];
 
-		this.emit(`change`, property, undefined, proxy, object[property]);
-		this.emit(`change;${id}`, property, undefined, proxy, object[property]);
-		this.emit(`change;${id};${property}`, undefined, proxy, object[property]);
+		this.emit(`change`, proxy, property, undefined, object[property]);
+		this.emit(`change;${id}`, proxy, property, undefined, object[property]);
+		this.emit(`change;${id};${property}`, proxy, property, undefined, object[property]);
 	}
 
 	_assign(id, property, value, vector_b) {
@@ -311,9 +311,9 @@ class Facsimile extends EventEmitter {
 
 		const proxy = this._proxy.get(object);
 
-		this.emit(`change`, property, object[property], proxy, previous);
-		this.emit(`change;${id}`, property, object[property], proxy, previous);
-		this.emit(`change;${id};${property}`, object[property], proxy, previous);
+		this.emit(`change`, proxy, property, object[property], previous);
+		this.emit(`change;${id}`, proxy, property, object[property], previous);
+		this.emit(`change;${id};${property}`, proxy, property, object[property], previous);
 	}
 
 	_flatten(object) {

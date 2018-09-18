@@ -187,13 +187,7 @@ class Facsimile extends EventEmitter {
 	_update_vector(target, property) {
 		// Update our write vector
 		const vectors = this._vectors.get(target);
-		let vector = vectors[property];
-
-		if (vector === undefined) {
-			vector = Vector.create(this._hostname);
-		} else {
-			vector = Vector.increment(vector, this._hostname);
-		}
+		let vector = Vector.increment(vectors[property], this._hostname);
 
 		vectors[property] = vector;
 

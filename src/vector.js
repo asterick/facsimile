@@ -14,6 +14,10 @@ class Vector {
 	static increment(a, hostname) {
 		const n = a.slice(0, -1);
 
+		if (!a) {
+			return [ 0, hostname ];
+		}
+
 		for (let i = 0; i < n.length; i++) {
 			if (n[i] < MAXIMUM_INT) {
 				n[i]++;

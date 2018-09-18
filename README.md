@@ -137,8 +137,7 @@ b.on('ready', () => {
 b.sync();
 ```
 
-Known Issues
-------------
+### Contact
 
-* Syncing all instances at the same time will cause a deadlock
-* Properties may cause desyncronization
+Twitter: [@asterick](https://twitter.com/asterick)
+GitHub: [@asterick](https://github.com/asterick)

@@ -165,7 +165,7 @@ class Facsimile extends EventEmitter {
 			return [ this._id.get(object) ];
 		}
 
-		const id = `${this._hostname}:${guid()}`;
+		const id = guid(this._hostname);
 		const values = new (Object.getPrototypeOf(object).constructor);
 
 		this._inject(id, object, this._hostname);
@@ -539,6 +539,11 @@ class Facsimile extends EventEmitter {
 		if (target[property] === value) return ;
 
 		if (typeof target[property] === 'object') this._schedule_gc();
+
+		// This object has a lock, 
+		if (this._locks.has(target)) {
+			throw this._locks.get(target);
+		}
 
 		// Signal this property has changed
 		const id = this._id.get(target);

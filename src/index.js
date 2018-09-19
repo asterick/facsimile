@@ -151,7 +151,17 @@ class Facsimile extends EventEmitter {
 			if (this._proxy.get(object) === proxy) return object;
 		}
 
-		throw new Error("Cannot determine underlying object");
+		// Was not a locally proxied object
+		return proxy;
+	}
+
+	_debug(object) {
+		object = this._reverse_proxy(object);
+
+		console.log(`
+ID: ${JSON.stringify(this._id.get(object))},
+Vectors: ${JSON.stringify(this._vectors.get(object))}
+		`);
 	}
 
 	_gc () {
@@ -413,9 +423,7 @@ class Facsimile extends EventEmitter {
 			vectors[id] = out_vect;
 			members[id] = this._flatten(object);
 
-			console.log(id, object, in_vect)
 			for (let key of Object.keys(object)) {
-				console.log(key, in_vect[key]);
 				if (!in_vect[key]) throw null;
 				out_vect[key] = in_vect[key];
 			}
@@ -532,12 +540,13 @@ class Facsimile extends EventEmitter {
 						const id = this._id.get(target);
 						const ret = funct.prototype.apply(target, args);
 						const values = this._flatten(target);
-						const vectors = this._vectors.get(target);
-						
-						// This is invalid
-						const vector = Vector.bulk_increment(vectors, this._hostname);
 
-						for (let [i, vector] of Object.entries(vectors)) {
+						// Invalidate existing write vectors
+						const vector = Vector.bulk_increment(this._vectors.get(target), this._hostname);
+						const vectors = new (Object.getPrototypeOf(target).constructor);
+
+						this._vectors.set(target, vectors);
+						for (let i of Object.keys(target)) {
 							vectors[i] = vector;
 						}
 

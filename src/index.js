@@ -46,6 +46,30 @@ class Facsimile extends EventEmitter {
 		this.send('sync');
 	}
 
+	lock (target) {
+		return this._locks.create(this._reverse_proxy(target));
+	}
+
+	release (target) {
+		this._locks.release(this._reverse_proxy(target));
+	}
+
+	async request(proxy) {
+		const target = this._reverse_proxy(proxy);
+
+		for (;;) {
+			await this._locks.await(target);
+
+			try {
+				await this._locks.create(target);
+			} catch (e) {
+				continue ;
+			}
+
+			return true;
+		}
+	}
+
 	send(message, payload) {
 		throw new Error('This object does not have support signalling');
 	}
@@ -122,6 +146,14 @@ class Facsimile extends EventEmitter {
 	}
 
 	// Private member calls
+	_reverse_proxy(proxy) {
+		for (let [id, object] of Object.entries(this._objects)) {
+			if (this._proxy.get(object) === proxy) return object;
+		}
+
+		throw new Error("Cannot determine underlying object");
+	}
+
 	_gc () {
 		if (!this._gc_handle) return ;
 		this._gc_handle = null;
@@ -440,15 +472,6 @@ class Facsimile extends EventEmitter {
 	get (target, property, proxy) {
 		// Injected calls
 		switch (property) {
-		case 'lock':
-			return _ => this._locks.create(target);
-
-		case 'available':
-			return this._locks.await(target);
-
-		case 'release':
-			return _ => this._locks.release(target);
-
 		case 'on':
 			return (prop, cb) => {
 				const ref = this._id.get(target);

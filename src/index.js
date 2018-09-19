@@ -413,8 +413,11 @@ class Facsimile extends EventEmitter {
 			vectors[id] = out_vect;
 			members[id] = this._flatten(object);
 
-			for (let [key, value] of Object.entries(object)) {
-				out_vect[key] = in_vect[key].concat();
+			console.log(id, object, in_vect)
+			for (let key of Object.keys(object)) {
+				console.log(key, in_vect[key]);
+				if (!in_vect[key]) throw null;
+				out_vect[key] = in_vect[key];
 			}
 		}
 
@@ -530,8 +533,9 @@ class Facsimile extends EventEmitter {
 						const ret = funct.prototype.apply(target, args);
 						const values = this._flatten(target);
 						const vectors = this._vectors.get(target);
-						const weight = vectors.reduce((acc, vec) => Math.max(acc, vec[0]), 0) + 1;
-						const vector = [ weight, this._hostname ];
+						
+						// This is invalid
+						const vector = Vector.bulk_increment(vectors, this._hostname);
 
 						for (let [i, vector] of Object.entries(vectors)) {
 							vectors[i] = vector;

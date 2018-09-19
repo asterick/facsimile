@@ -53,8 +53,6 @@ class Locks {
 	release(target) {
 		const lock = this._locks.get(target);
 
-		console.log(lock)
-
 		if (!lock || !lock.fixed) {
 			throw new Error("Object is not locked");
 		}

@@ -147,7 +147,7 @@ class Facsimile extends EventEmitter {
 
 	// Private member calls
 	_reverse_proxy(proxy) {
-		for (let [id, object] of Object.entries(this._objects)) {
+		for (let object of Object.values(this._objects)) {
 			if (this._proxy.get(object) === proxy) return object;
 		}
 

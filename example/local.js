@@ -45,14 +45,14 @@ async function arrayFunctions() {
 	const array = b.store.elements;
 
 	console.log("Locking")
-	await array.lock();
-	console.log("Locked")
+	await b.lock(array);
+	console.log("Locked");
 
 	console.log("Trying to create a dead lock");
 	try {
-		await b.store.elements.lock();	// This will fail because A owns the lock
+		await a.request(a.store.elements);
 	} catch (e) {
-		console.log(e);
+		console.log("Intentional error:", e);
 	}
 
 	b.store.elements[0] = 999;
@@ -61,16 +61,7 @@ async function arrayFunctions() {
 	b.store.elements.sort((a, b) => (a - b));
 
 	console.log("Unlocking");
-	array.release();
-
-	console.log("Waiting for unlock");
-	await a.store.elements.available;
-
-	console.log("Locking")
-	await a.store.elements.lock();
-	console.log("Unlocking")
-	a.store.elements[2] = 123;
-	a.store.elements.release();
+	b.release(array);
 }
 
 b.on('ready', () => {

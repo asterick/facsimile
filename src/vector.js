@@ -11,12 +11,18 @@ class Vector {
 			 || a.some((v, i) => v < b[i]);
 	}
 
-	static increment(a, hostname) {
-		const n = a.slice(0, -1);
+	static bulk_increment(array, hostname) {
+		const max = array.reduce((a, b) => (Vector.compare(a, b) ? b : a));
 
+		return Vector.increment(max, hostname);
+	}
+
+	static increment(a, hostname) {
 		if (!a) {
 			return [ 0, hostname ];
 		}
+
+		const n = a.slice(0, -1);
 
 		for (let i = 0; i < n.length; i++) {
 			if (n[i] < MAXIMUM_INT) {

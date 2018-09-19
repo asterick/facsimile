@@ -46,6 +46,30 @@ class Facsimile extends EventEmitter {
 		this.send('sync');
 	}
 
+	request (target) {
+		return this._locks.create(this._reverse_proxy(target));
+	}
+
+	release (target) {
+		this._locks.release(this._reverse_proxy(target));
+	}
+
+	async lock(proxy) {
+		const target = this._reverse_proxy(proxy);
+
+		for (;;) {
+			await this._locks.await(target);
+
+			try {
+				await this._locks.create(target);
+			} catch (e) {
+				continue ;
+			}
+
+			return true;
+		}
+	}
+
 	send(message, payload) {
 		throw new Error('This object does not have support signalling');
 	}
@@ -122,6 +146,24 @@ class Facsimile extends EventEmitter {
 	}
 
 	// Private member calls
+	_reverse_proxy(proxy) {
+		for (let object of Object.values(this._objects)) {
+			if (this._proxy.get(object) === proxy) return object;
+		}
+
+		// Was not a locally proxied object
+		return proxy;
+	}
+
+	_debug(object) {
+		object = this._reverse_proxy(object);
+
+		console.log(`
+ID: ${JSON.stringify(this._id.get(object))},
+Vectors: ${JSON.stringify(this._vectors.get(object))}
+		`);
+	}
+
 	_gc () {
 		if (!this._gc_handle) return ;
 		this._gc_handle = null;
@@ -381,8 +423,9 @@ class Facsimile extends EventEmitter {
 			vectors[id] = out_vect;
 			members[id] = this._flatten(object);
 
-			for (let [key, value] of Object.entries(object)) {
-				out_vect[key] = in_vect[key].concat();
+			for (let key of Object.keys(object)) {
+				if (!in_vect[key]) throw null;
+				out_vect[key] = in_vect[key];
 			}
 		}
 
@@ -440,15 +483,6 @@ class Facsimile extends EventEmitter {
 	get (target, property, proxy) {
 		// Injected calls
 		switch (property) {
-		case 'lock':
-			return _ => this._locks.create(target);
-
-		case 'available':
-			return this._locks.await(target);
-
-		case 'release':
-			return _ => this._locks.release(target);
-
 		case 'on':
 			return (prop, cb) => {
 				const ref = this._id.get(target);
@@ -506,11 +540,13 @@ class Facsimile extends EventEmitter {
 						const id = this._id.get(target);
 						const ret = funct.prototype.apply(target, args);
 						const values = this._flatten(target);
-						const vectors = this._vectors.get(target);
-						const weight = vectors.reduce((acc, vec) => Math.max(acc, vec[0]), 0) + 1;
-						const vector = [ weight, this._hostname ];
 
-						for (let [i, vector] of Object.entries(vectors)) {
+						// Invalidate existing write vectors
+						const vector = Vector.bulk_increment(this._vectors.get(target), this._hostname);
+						const vectors = new (Object.getPrototypeOf(target).constructor);
+
+						this._vectors.set(target, vectors);
+						for (let i of Object.keys(target)) {
 							vectors[i] = vector;
 						}
 

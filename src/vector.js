@@ -1,4 +1,4 @@
-const MAXIMUM_INT = 0xFFFFFFFF;
+const MAXIMUM_INT = 0x7FFFFFFF;
 
 class Vector {
 	static create(hostname) {

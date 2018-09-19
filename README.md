@@ -45,7 +45,7 @@ already been established.
 
 **NOTE: You must pass an object returned from the Facsimile.state collection**
 
-### Facsimile.release(object):Promise
+### Facsimile.release(object)
 
 Release lock on object, will throw an error if the object is not owned by host node.
 

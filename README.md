@@ -31,6 +31,26 @@ A monitored object used to manage your state.  It can be accessed like any other
 
 Tells the instance to flush it's state, and request syncronization data from the network
 
+### Facsimile.lock(object):Promise
+
+Request exclusive write permissions to an object, promise will not resolve until the lock has
+been established
+
+**NOTE: You must pass an object returned from the Facsimile.state collection**
+
+### Facsimile.request(object):Promise
+
+Request exclusive write permissions to an object, promise will return a failure if the lock has
+already been established.
+
+**NOTE: You must pass an object returned from the Facsimile.state collection**
+
+### Facsimile.release(object):Promise
+
+Release lock on object, will throw an error if the object is not owned by host node.
+
+**NOTE: You must pass an object returned from the Facsimile.state collection**
+
 ### Facsimile.send(message, payload)
 
 This function must be overloaded as a part of setting up a communications pipeline.  For every
@@ -127,11 +147,32 @@ b.on('root_changed', () => {
 	console.log("Root element has changed.");
 });
 
-b.on('ready', () => {
-	console.log("elements =", b.store.elements);
+async function arrayFunctions() {
+	const array = b.store.elements;
+
+	console.log("Locking")
+	await b.request(array);
+	console.log("Locked");
+
+	console.log("Trying to create a dead lock");
+	try {
+		await a.lock(a.store.elements);
+	} catch (e) {
+		console.log("Intentional error:", e);
+	}
 
 	b.store.elements[0] = 999;
 	b.store.elements[1] = 888;
+	b.store.elements.unshift(4);
+	b.store.elements.sort((a, b) => (a - b));
+
+	console.log("Unlocking");
+	b.release(array);
+}
+
+b.on('ready', () => {
+	console.log("elements =", b.store.elements);
+	arrayFunctions()
 });
 
 b.sync();
@@ -139,4 +180,4 @@ b.sync();
 
 ### Contact
 
-**@asterick**: [Twitter](https://twitter.com/asterick) [GitHub](https://github.com/asterick)
+**@asterick**: [Twitter](https://twitter.com/asterick) | [GitHub](https://github.com/asterick)

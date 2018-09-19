@@ -151,12 +151,12 @@ async function arrayFunctions() {
 	const array = b.store.elements;
 
 	console.log("Locking")
-	await b.request(array);
+	await b.lock(array);
 	console.log("Locked");
 
 	console.log("Trying to create a dead lock");
 	try {
-		await a.lock(a.store.elements);
+		await a.request(a.store.elements);
 	} catch (e) {
 		console.log("Intentional error:", e);
 	}

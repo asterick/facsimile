@@ -46,7 +46,7 @@ class Facsimile extends EventEmitter {
 		this.send('sync');
 	}
 
-	lock (target) {
+	request (target) {
 		return this._locks.create(this._reverse_proxy(target));
 	}
 
@@ -54,7 +54,7 @@ class Facsimile extends EventEmitter {
 		this._locks.release(this._reverse_proxy(target));
 	}
 
-	async request(proxy) {
+	async lock(proxy) {
 		const target = this._reverse_proxy(proxy);
 
 		for (;;) {

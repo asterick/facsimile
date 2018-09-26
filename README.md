@@ -1,5 +1,7 @@
 # Facsimile
 
+[![Build Status](https://travis-ci.com/asterick/facsimile.svg?branch=master)](https://travis-ci.com/asterick/facsimile)
+
 > Transparent object mirroring across process boundaries, with change monitoring
 
 ## Installation
@@ -99,7 +101,7 @@ Caveats:
 * Messages sent from a node must be relayed in order.
 * How messages are interleaved between multiple nodes does not matter
 * Messages are committed in 'Last Written' priority
-* If the system cannot determine who wrote last, the host with the lowest 'hostname' wins
+* If the system cannot determine who wrote last, the host with the highest 'hostname' wins
 
 ## Basic local example
 

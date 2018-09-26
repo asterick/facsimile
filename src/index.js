@@ -36,7 +36,7 @@ class Facsimile extends EventEmitter {
     set store(base) {
         this._root = base;
         this.send('root', { root: this._reference(base) });
-        this.emit('root_changed');
+        this.emit('root_changed', this.store);
     }
 
     sync() {
@@ -92,7 +92,7 @@ class Facsimile extends EventEmitter {
         case 'root':
             this._dereference(this, '_root', payload.root);
             this._schedule_gc();
-            this.emit('root_changed');
+            this.emit('root_changed', this.store);
             break ;
         case 'export':
             this._export(payload.hostname, payload.references);
@@ -123,7 +123,7 @@ class Facsimile extends EventEmitter {
             // Ignore modifications to objects in a pending state
             if (this._objects[payload.id] === undefined) break ;
 
-            this._call(payload.id, payload.name, payload.host, payload.parameters);
+            this._call(payload.id, payload.name, payload.vector, payload.parameters);
             this._schedule_gc();
             break ;
         case 'replace':
@@ -339,9 +339,9 @@ class Facsimile extends EventEmitter {
 
         delete object[property];
 
-        this.emit('change', proxy, property, undefined, object[property]);
-        this.emit(`change;${id}`, proxy, property, undefined, object[property]);
-        this.emit(`change;${id};${property}`, proxy, property, undefined, object[property]);
+        this.emit('change', proxy, property);
+        this.emit(`change;${id}`, proxy, property);
+        this.emit(`change;${id};${property}`, proxy, property);
     }
 
     _assign(id, property, value, vector_b) {
@@ -358,15 +358,13 @@ class Facsimile extends EventEmitter {
 
         vectors[property] = vector_b;
 
-        const previous = object[property];
-
         this._dereference(object, property, value);
 
         const proxy = this._proxy.get(object);
 
-        this.emit('change', proxy, property, object[property], previous);
-        this.emit(`change;${id}`, proxy, property, object[property], previous);
-        this.emit(`change;${id};${property}`, proxy, property, object[property], previous);
+        this.emit('change', proxy, property);
+        this.emit(`change;${id}`, proxy, property);
+        this.emit(`change;${id};${property}`, proxy, property);
     }
 
     _flatten(object) {
@@ -405,7 +403,7 @@ class Facsimile extends EventEmitter {
             delete this._pending[id];
 
             if (--this._pending_count == 0) {
-                this.emit('ready');
+                this.emit('ready', this.store);
             }
         }
     }
@@ -438,7 +436,7 @@ class Facsimile extends EventEmitter {
         this.send('root', { root: this._reference(this._root) });
     }
 
-    _call(id, name, host, parameters) {
+    _call(id, name, vector, parameters) {
         const target = this._objects[id];
         const proxy = this._proxy.get(target);
 
@@ -451,8 +449,10 @@ class Facsimile extends EventEmitter {
             this._dereference(parameters, key, value);
         }
 
-        const funct = CallNames[name].bypass;
-        funct.call(target, host, this._vectors.get(target), ... parameters);
+        const funct = CallNames[name].prototype;
+        funct.call(target, ... parameters);
+
+        this._replace_set(target, vector);
 
         this.emit('change', proxy);
         this.emit(`change;${id}`, proxy);
@@ -463,6 +463,14 @@ class Facsimile extends EventEmitter {
         const proxy = this._proxy.get(target);
 
         const vectors = this._vectors.get(target);
+
+        // Trim array to match length
+        if (Array.isArray(target)) {
+            while (target.length > values.length) {
+                target.pop();
+                vectors.pop();
+            }
+        }
 
         // Flush previous instances
         for (let key of Object.keys(target)) {
@@ -481,6 +489,24 @@ class Facsimile extends EventEmitter {
 
         this.emit('change', proxy);
         this.emit(`change;${id}`, proxy);
+    }
+
+    _increment_set(target) {
+        // Invalidate existing write vectors
+        const vector = Vector.increment_set(this._vectors.get(target), this._hostname);
+        this._replace_set(target, vector);
+
+        return vector;
+    }
+
+    _replace_set(target, vector) {
+        // Invalidate existing write vectors
+        const vectors = new (Object.getPrototypeOf(target).constructor);
+
+        this._vectors.set(target, vectors);
+        for (let i of Object.keys(target)) {
+            vectors[i] = vector;
+        }
     }
 
     // Proxy handlers
@@ -529,13 +555,15 @@ class Facsimile extends EventEmitter {
                 return (... args) => {
                     const id = this._id.get(target);
                     const parameters = this._flatten(args);
-                    const ret = funct.bypass.call(target, this._hostname, this._vectors.get(target), ... args);
+                    const ret = funct.prototype.call(target, ... args);
                     const name = funct.name;
+
+                    const vector = this._increment_set(target);
 
                     this.emit('change', proxy);
                     this.emit(`change;${id}`, proxy);
 
-                    this.send('call', { id, name, host: this._hostname, parameters });
+                    this.send('call', { id, name, vector, parameters });
 
                     return ret;
                 };
@@ -545,14 +573,7 @@ class Facsimile extends EventEmitter {
                     const ret = funct.prototype.apply(target, args);
                     const values = this._flatten(target);
 
-                    // Invalidate existing write vectors
-                    const vector = Vector.bulk_increment(this._vectors.get(target), this._hostname);
-                    const vectors = new (Object.getPrototypeOf(target).constructor);
-
-                    this._vectors.set(target, vectors);
-                    for (let i of Object.keys(target)) {
-                        vectors[i] = vector;
-                    }
+                    const vector = this._increment_set(target);
 
                     this.emit('change', proxy);
                     this.emit(`change;${id}`, proxy);
@@ -570,6 +591,8 @@ class Facsimile extends EventEmitter {
     }
 
     deleteProperty (target, property) {
+        if (target[property] === undefined) return true;
+
         if (typeof target[property] === 'object') this._schedule_gc();
 
         const id = this._id.get(target);
@@ -593,7 +616,7 @@ class Facsimile extends EventEmitter {
 
     set (target, property, value, proxy) {
         // Unmodified value
-        if (target[property] === value) return ;
+        if (target[property] === value) return true;
 
         if (typeof target[property] === 'object') this._schedule_gc();
 

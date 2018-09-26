@@ -1,7 +1,7 @@
 const guid = require('../src/guid');
 const test = require('ava');
 
-test('Basic exception handling', test => {
+test('Guid uniqueness', test => {
     const array = [];
 
     // Run for 5 ms

@@ -1,26 +1,7 @@
 const Facsimile = require('..');
 const test = require('ava');
 
-function forTime(time) {
-    return new Promise((pass) => {
-        setTimeout(pass, time);
-    });
-}
-
-function link(... hosts) {
-    for (let source of hosts) {
-        source.send = (... args) => {
-            const mirrored = JSON.parse(JSON.stringify(args));
-            setTimeout(() => {
-                for (let target of hosts) {
-                    if (target === source) continue ;
-                    //console.log(source._hostname, "->", target._hostname, ... args);
-                    target.receive(... mirrored);
-                }
-            }, 10);
-        };
-    }
-}
+const { link } = require('./util');
 
 test('Basic locking works', async test => {
     const start = { b: 8000 };
@@ -29,7 +10,7 @@ test('Basic locking works', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(server, client);
+    const idle = link(server, client);
 
     server.store = start;
 
@@ -42,11 +23,11 @@ test('Basic locking works', async test => {
         test.fail('Lock should succeed');
     }
 
-    await forTime(100);
+    await idle();
 
     server.release(server.store);
 
-    await forTime(100);
+    await idle();
 
     test.deepEqual(client.store, result, 'Values are deeply equal');
 });
@@ -55,7 +36,7 @@ test('Locks should be exclusive', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(server, client);
+    const idle = link(server, client);
 
     server.store = {};
 
@@ -72,11 +53,11 @@ test('Locks should be exclusive', async test => {
         test.fail('Lock should succeed');
     }
 
-    await forTime(100);
+    await idle();
 
     server.release(server.store);
 
-    await forTime(100);
+    await idle();
 
     test.truthy(client.store.a === 9, 'exception was triggered');
 });
@@ -87,7 +68,7 @@ test('Locks should be enforced', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(server, client);
+    const idle = link(server, client);
 
     server.store = {};
 
@@ -104,11 +85,11 @@ test('Locks should be enforced', async test => {
         test.fail('Lock should succeed');
     }
 
-    await forTime(100);
+    await idle();
 
     server.release(server.store);
 
-    await forTime(100);
+    await idle();
 
     test.deepEqual(client.store, result, 'Values are deeply equal');
 });
@@ -119,7 +100,7 @@ test('Locks cannot be released by non-owner', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(server, client);
+    const idle = link(server, client);
 
     server.store = {};
 
@@ -136,11 +117,11 @@ test('Locks cannot be released by non-owner', async test => {
         test.fail('Lock should succeed');
     }
 
-    await forTime(100);
+    await idle();
 
     server.release(server.store);
 
-    await forTime(100);
+    await idle();
 
     test.deepEqual(client.store, result, 'Values are deeply equal');
 });
@@ -151,11 +132,11 @@ test('Highest host should lock first', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(server, client);
+    const idle = link(server, client);
 
     server.store = {};
 
-    await forTime(100);
+    await idle();
 
     let index = 1;
     async function lock(host, node, order) {
@@ -163,7 +144,7 @@ test('Highest host should lock first', async test => {
         test.truthy(index++ === order, 'locked in order');
         node.store[host] = true;
         node.release(node.store);
-        await forTime(10);
+        await idle();
     }
 
     await Promise.all([ lock('b', client, 1), lock('a', server, 2) ]);
@@ -175,11 +156,11 @@ test('Highest host should lock first', async test => {
 test('Cannot release an unlocked object', async test => {
     const server = new Facsimile('a');
 
-    link(server);
+    const idle = link(server);
 
     server.store = {};
 
-    await forTime(100);
+    await idle();
 
     const error = test.throws(() => {
         server.release(server.store);
@@ -195,7 +176,7 @@ test('Cannot use modify calls on locked arrays', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(server, client);
+    const idle = link(server, client);
 
     server.store = start;
 
@@ -208,7 +189,7 @@ test('Cannot use modify calls on locked arrays', async test => {
     server.store.push(4);
     server.release(server.store);
 
-    await forTime(100);
+    await idle();
 
     test.deepEqual(client.store, server.store, 'both arrays must match');
     test.deepEqual(client.store, result, 'array must have sorted');

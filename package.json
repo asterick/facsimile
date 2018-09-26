@@ -8,7 +8,7 @@
   },
   "scripts": {
     "lint": "eslint src test",
-    "test": "nyc ava && npm run lint"
+    "test": "nyc --reporter=html --reporter=text ava && npm run lint"
   },
   "repository": {
     "type": "git",

@@ -8,7 +8,8 @@
   },
   "scripts": {
     "lint": "eslint src test",
-    "test": "nyc --reporter=html --reporter=text ava && npm run lint"
+    "report": "nyc report --reporter=text-lcov | coveralls",
+    "test": "nyc --reporter=text --reporter=html ava && npm run lint && npm run report"
   },
   "repository": {
     "type": "git",
@@ -27,6 +28,7 @@
   "homepage": "https://github.com/asterick/facsimile#readme",
   "devDependencies": {
     "ava": "^0.25.0",
+    "coveralls": "^3.0.2",
     "eslint": "^5.6.0",
     "nyc": "^13.0.1"
   },

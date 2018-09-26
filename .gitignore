@@ -1,2 +1,5 @@
 .DS_Store
 .vs_code
+.nyc_output
+package-lock.json
+node_modules

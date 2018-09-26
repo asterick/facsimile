@@ -33,8 +33,8 @@ test('can create a vector larger than entire set', test => {
     const set_a = [Vector.increment(a, 'b'), a];
     const set_b = [a, Vector.increment(a, 'b')];
 
-    const b = Vector.bulk_increment(set_a, '\x00');
-    const c = Vector.bulk_increment(set_b, '\x00');
+    const b = Vector.increment_set(set_a, '\x00');
+    const c = Vector.increment_set(set_b, '\x00');
 
     test.deepEqual(b, c, 'Incremented set is the same regardless of order');
 

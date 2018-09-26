@@ -1,26 +1,7 @@
 const Facsimile = require('..');
 const test = require('ava');
 
-function forTime(time) {
-    return new Promise((pass) => {
-        setTimeout(pass, time);
-    });
-}
-
-function link(... hosts) {
-    for (let source of hosts) {
-        source.send = (... args) => {
-            const mirrored = JSON.parse(JSON.stringify(args));
-            setTimeout(() => {
-                for (let target of hosts) {
-                    if (target === source) continue ;
-                    //console.log(source._hostname, "->", target._hostname, ... args);
-                    target.receive(... mirrored);
-                }
-            }, 10);
-        };
-    }
-}
+const { forTime, link } = require('./util');
 
 test('Basic locking works', async test => {
     const start = { b: 8000 };

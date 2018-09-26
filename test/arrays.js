@@ -1,25 +1,6 @@
 const Facsimile = require('..');
 const test = require('ava');
-
-function forTime(time) {
-    return new Promise((pass) => {
-        setTimeout(pass, time);
-    });
-}
-
-function link(... hosts) {
-    for (let source of hosts) {
-        source.send = (... args) => {
-            const mirrored = JSON.parse(JSON.stringify(args));
-            setTimeout(() => {
-                for (let target of hosts) {
-                    if (target === source) continue ;
-                    target.receive(... mirrored);
-                }
-            }, 10);
-        };
-    }
-}
+const { forTime, link, consistent } = require('./util');
 
 test('Basic sort works', async test => {
     const result = [1, 2, 3, 4];
@@ -28,10 +9,6 @@ test('Basic sort works', async test => {
     const client = new Facsimile('b');
 
     link(client, server);
-
-    // Signal forwarding (same amount of time between)
-    server.send = (... args) => setTimeout(() => client.receive(... args), 10);
-    client.send = (... args) => setTimeout(() => server.receive(... args), 10);
 
     server.store = [3, 1, 4, 2];
     server.store.sort((a, b) => (a - b));
@@ -53,10 +30,10 @@ test('Unlocked objects should use replace', async test => {
 
     server.send = (msg, ... args) => {
         if (msg === 'call') called = true;
-        setTimeout(() => client.receive(msg, ... args), 10);
+        setTimeout(() => client.receive(msg, ... args), 1);
     };
 
-    client.send = (... args) => setTimeout(() => server.receive(... args), 10);
+    client.send = (... args) => setTimeout(() => server.receive(... args), 1);
 
     server.store = start;
     server.store.push(4);
@@ -79,10 +56,10 @@ test('Locking should use in-place modifies', async test => {
 
     server.send = (msg, ... args) => {
         if (msg === 'call') called = true;
-        setTimeout(() => client.receive(msg, ... args), 10);
+        setTimeout(() => client.receive(msg, ... args), 1);
     };
 
-    client.send = (... args) => setTimeout(() => server.receive(... args), 10);
+    client.send = (... args) => setTimeout(() => server.receive(... args), 1);
 
     server.store = start;
 
@@ -95,4 +72,85 @@ test('Locking should use in-place modifies', async test => {
     test.truthy(called, 'Used an in-place call with a lock');
     test.deepEqual(client.store, server.store, 'both arrays must match');
     test.deepEqual(client.store, result, 'array must have sorted');
+});
+
+test('in-place pop works as expected', async test => {
+    const server = new Facsimile('a');
+    const client = new Facsimile('b');
+
+    link(server, client);
+
+    server.store = [1,2,3,4];
+
+    await server.lock(server.store);
+
+    test.truthy(server.store.pop() === 4, 'Value was returned');
+
+    await forTime(100);
+
+    consistent(test, server, client);
+
+    const vectors = [
+        [server._hostname, 1],
+        [server._hostname, 1],
+        [server._hostname, 1],
+    ];
+
+    test.deepEqual(server.store, [1, 2, 3], 'Value was removed');
+    test.deepEqual(server._debug(server.store).vectors, vectors, 'Write vectors are what we expect');
+});
+
+test('in-place push works as expected', async test => {
+    const server = new Facsimile('a');
+    const client = new Facsimile('b');
+
+    link(server, client);
+
+    server.store = [1,2,3,4];
+
+    await server.lock(server.store);
+
+    server.store.push(5);
+
+    await forTime(100);
+
+    consistent(test, server, client);
+
+    const vectors = [
+        [server._hostname, 1],
+        [server._hostname, 1],
+        [server._hostname, 1],
+        [server._hostname, 1],
+        [server._hostname, 1]
+    ];
+
+    test.deepEqual(server.store, [1, 2, 3, 4, 5], 'Value was appended');
+    test.deepEqual(server._debug(server.store).vectors, vectors, 'Write vectors are what we expect');
+});
+
+test('in-place reverse works as expected', async test => {
+    const server = new Facsimile('a');
+    const client = new Facsimile('b');
+
+    link(server, client);
+
+    server.store = [1,2,3,4];
+
+    await server.lock(server.store);
+
+    server.store.reverse();
+
+    await forTime(100);
+
+    consistent(test, server, client);
+
+    const vectors = [
+        [server._hostname, 1],
+        [server._hostname, 1],
+        [server._hostname, 1],
+        [server._hostname, 1]
+    ];
+
+    test.deepEqual(server.store, [4, 3, 2, 1], 'Values were removed');
+    test.deepEqual(server._debug(server.store).vectors, vectors, 'Write vectors are what we expect');
 });

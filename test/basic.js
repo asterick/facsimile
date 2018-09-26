@@ -1,11 +1,6 @@
 const Facsimile = require('..');
 const test = require('ava');
-
-function forTime(time) {
-    return new Promise((pass) => {
-        setTimeout(pass, time);
-    });
-}
+const { forTime } = require('./util');
 
 test('Basic exception handling', test => {
     const server = new Facsimile('a');

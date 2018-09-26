@@ -22,7 +22,7 @@ class Vector {
         }
     }
 
-    static bulk_increment(array, hostname) {
+    static increment_set(array, hostname) {
         const max = array.reduce((a, b) => (Vector.compare(a, b) ? b : a));
 
         return Vector.increment(max, hostname);

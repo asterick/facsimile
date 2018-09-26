@@ -123,7 +123,7 @@ class Facsimile extends EventEmitter {
             // Ignore modifications to objects in a pending state
             if (this._objects[payload.id] === undefined) break ;
 
-            this._call(payload.id, payload.name, payload.host, payload.parameters);
+            this._call(payload.id, payload.name, payload.vector, payload.parameters);
             this._schedule_gc();
             break ;
         case 'replace':
@@ -438,7 +438,7 @@ class Facsimile extends EventEmitter {
         this.send('root', { root: this._reference(this._root) });
     }
 
-    _call(id, name, host, parameters) {
+    _call(id, name, vector, parameters) {
         const target = this._objects[id];
         const proxy = this._proxy.get(target);
 
@@ -451,8 +451,10 @@ class Facsimile extends EventEmitter {
             this._dereference(parameters, key, value);
         }
 
-        const funct = CallNames[name].bypass;
-        funct.call(target, host, this._vectors.get(target), ... parameters);
+        const funct = CallNames[name].prototype;
+        funct.call(target, ... parameters);
+
+        this._replace_set(target, vector);
 
         this.emit('change', proxy);
         this.emit(`change;${id}`, proxy);
@@ -481,6 +483,24 @@ class Facsimile extends EventEmitter {
 
         this.emit('change', proxy);
         this.emit(`change;${id}`, proxy);
+    }
+
+    _increment_set(target) {
+        // Invalidate existing write vectors
+        const vector = Vector.increment_set(this._vectors.get(target), this._hostname);
+        this._replace_set(target, vector);
+
+        return vector;
+    }
+
+    _replace_set(target, vector) {
+        // Invalidate existing write vectors
+        const vectors = new (Object.getPrototypeOf(target).constructor);
+
+        this._vectors.set(target, vectors);
+        for (let i of Object.keys(target)) {
+            vectors[i] = vector;
+        }
     }
 
     // Proxy handlers
@@ -529,13 +549,15 @@ class Facsimile extends EventEmitter {
                 return (... args) => {
                     const id = this._id.get(target);
                     const parameters = this._flatten(args);
-                    const ret = funct.bypass.call(target, this._hostname, this._vectors.get(target), ... args);
+                    const ret = funct.prototype.call(target, ... args);
                     const name = funct.name;
+
+                    const vector = this._increment_set(target);
 
                     this.emit('change', proxy);
                     this.emit(`change;${id}`, proxy);
 
-                    this.send('call', { id, name, host: this._hostname, parameters });
+                    this.send('call', { id, name, vector, parameters });
 
                     return ret;
                 };
@@ -545,14 +567,7 @@ class Facsimile extends EventEmitter {
                     const ret = funct.prototype.apply(target, args);
                     const values = this._flatten(target);
 
-                    // Invalidate existing write vectors
-                    const vector = Vector.bulk_increment(this._vectors.get(target), this._hostname);
-                    const vectors = new (Object.getPrototypeOf(target).constructor);
-
-                    this._vectors.set(target, vectors);
-                    for (let i of Object.keys(target)) {
-                        vectors[i] = vector;
-                    }
+                    const vector = this._increment_set(target);
 
                     this.emit('change', proxy);
                     this.emit(`change;${id}`, proxy);

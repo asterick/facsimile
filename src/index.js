@@ -36,7 +36,7 @@ class Facsimile extends EventEmitter {
     set store(base) {
         this._root = base;
         this.send('root', { root: this._reference(base) });
-        this.emit('root_changed');
+        this.emit('root_changed', this.store);
     }
 
     sync() {
@@ -92,7 +92,7 @@ class Facsimile extends EventEmitter {
         case 'root':
             this._dereference(this, '_root', payload.root);
             this._schedule_gc();
-            this.emit('root_changed');
+            this.emit('root_changed', this.store);
             break ;
         case 'export':
             this._export(payload.hostname, payload.references);
@@ -339,9 +339,9 @@ class Facsimile extends EventEmitter {
 
         delete object[property];
 
-        this.emit('change', proxy, property, undefined, object[property]);
-        this.emit(`change;${id}`, proxy, property, undefined, object[property]);
-        this.emit(`change;${id};${property}`, proxy, property, undefined, object[property]);
+        this.emit('change', proxy, property);
+        this.emit(`change;${id}`, proxy, property);
+        this.emit(`change;${id};${property}`, proxy, property);
     }
 
     _assign(id, property, value, vector_b) {
@@ -358,15 +358,13 @@ class Facsimile extends EventEmitter {
 
         vectors[property] = vector_b;
 
-        const previous = object[property];
-
         this._dereference(object, property, value);
 
         const proxy = this._proxy.get(object);
 
-        this.emit('change', proxy, property, object[property], previous);
-        this.emit(`change;${id}`, proxy, property, object[property], previous);
-        this.emit(`change;${id};${property}`, proxy, property, object[property], previous);
+        this.emit('change', proxy, property);
+        this.emit(`change;${id}`, proxy, property);
+        this.emit(`change;${id};${property}`, proxy, property);
     }
 
     _flatten(object) {
@@ -405,7 +403,7 @@ class Facsimile extends EventEmitter {
             delete this._pending[id];
 
             if (--this._pending_count == 0) {
-                this.emit('ready');
+                this.emit('ready', this.store);
             }
         }
     }

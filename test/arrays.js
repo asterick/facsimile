@@ -8,12 +8,12 @@ test('Basic sort works', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(client, server);
+    const idle = link(client, server);
 
     server.store = [3, 1, 4, 2];
     server.store.sort((a, b) => (a - b));
 
-    await forTime(100);
+    await idle();
 
     test.deepEqual(client.store, server.store, 'both arrays must match');
     test.deepEqual(client.store, result, 'array must have sorted');
@@ -30,15 +30,15 @@ test('Unlocked objects should use replace', async test => {
 
     server.send = (msg, ... args) => {
         if (msg === 'call') called = true;
-        setTimeout(() => client.receive(msg, ... args), 1);
+        setTimeout(() => client.receive(msg, ... args), 0);
     };
 
-    client.send = (... args) => setTimeout(() => server.receive(... args), 1);
+    client.send = (... args) => setTimeout(() => server.receive(... args), 0);
 
     server.store = start;
     server.store.push(4);
 
-    await forTime(100);
+    await forTime(5);
 
     test.falsy(called, 'Used an replace call with a lock');
     test.deepEqual(client.store, server.store, 'both arrays must match');
@@ -56,10 +56,10 @@ test('Locking should use in-place modifies', async test => {
 
     server.send = (msg, ... args) => {
         if (msg === 'call') called = true;
-        setTimeout(() => client.receive(msg, ... args), 1);
+        setTimeout(() => client.receive(msg, ... args), 0);
     };
 
-    client.send = (... args) => setTimeout(() => server.receive(... args), 1);
+    client.send = (... args) => setTimeout(() => server.receive(... args), 0);
 
     server.store = start;
 
@@ -67,7 +67,7 @@ test('Locking should use in-place modifies', async test => {
     server.store.push(4);
     server.release(server.store);
 
-    await forTime(100);
+    await forTime(5);
 
     test.truthy(called, 'Used an in-place call with a lock');
     test.deepEqual(client.store, server.store, 'both arrays must match');
@@ -78,7 +78,7 @@ test('in-place pop works as expected', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(server, client);
+    const idle = link(server, client);
 
     server.store = [1,2,3,4];
 
@@ -86,7 +86,7 @@ test('in-place pop works as expected', async test => {
 
     test.truthy(server.store.pop() === 4, 'Value was returned');
 
-    await forTime(100);
+    await idle();
 
     consistent(test, server, client);
 
@@ -104,7 +104,7 @@ test('in-place push works as expected', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(server, client);
+    const idle = link(server, client);
 
     server.store = [1,2,3,4];
 
@@ -112,7 +112,7 @@ test('in-place push works as expected', async test => {
 
     server.store.push(5);
 
-    await forTime(100);
+    await idle();
 
     consistent(test, server, client);
 
@@ -132,7 +132,7 @@ test('in-place reverse works as expected', async test => {
     const server = new Facsimile('a');
     const client = new Facsimile('b');
 
-    link(server, client);
+    const idle = link(server, client);
 
     server.store = [1,2,3,4];
 
@@ -140,7 +140,7 @@ test('in-place reverse works as expected', async test => {
 
     server.store.reverse();
 
-    await forTime(100);
+    await idle();
 
     consistent(test, server, client);
 

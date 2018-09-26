@@ -174,13 +174,13 @@ test('Highest host wins', async test => {
     const client = new Facsimile('b');
 
     // Signal forwarding (same amount of time between)
-    server.send = (... args) => setTimeout(() => client.receive(... args), 10);
-    client.send = (... args) => setTimeout(() => server.receive(... args), 10);
+    server.send = (... args) => setTimeout(() => client.receive(... args), 0);
+    client.send = (... args) => setTimeout(() => server.receive(... args), 0);
 
     // Mess with our store
     server.store = value;
 
-    await forTime(100);
+    await forTime(5);
 
     test.deepEqual(client.store, value, 'Values are deeply equal');
 
@@ -188,7 +188,7 @@ test('Highest host wins', async test => {
     server.store.r = 100;
     client.store.r = 200;
 
-    await forTime(100);
+    await forTime(5);
 
     test.truthy(server.store.r === client.store.r, 'Values should be the same');
     test.truthy(server.store.r === 200, 'Client should have won conflict');

@@ -5,17 +5,35 @@ function forTime(time) {
 }
 
 function link(... hosts) {
+    let pending = 0;
+
     for (let source of hosts) {
         source.send = (... args) => {
+            pending ++;
             const mirrored = JSON.parse(JSON.stringify(args));
             setTimeout(() => {
                 for (let target of hosts) {
                     if (target === source) continue ;
                     target.receive(... mirrored);
                 }
-            }, 1);
+                pending --;
+            }, 0);
         };
     }
+
+    return () => {
+        return new Promise((pass) => {
+            function tick() {
+                if (pending > 0) {
+                    setInterval(tick, 1);
+                } else {
+                    pass();
+                }
+            }
+
+            tick();
+        });
+    };
 }
 
 function consistent(test, first, ... additional) {

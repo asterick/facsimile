@@ -1,6 +1,6 @@
 const Facsimile = require('..');
 const test = require('ava');
-const { forTime } = require('./util');
+const { link, consistent } = require('./util');
 
 test('Basic exception handling', test => {
     const server = new Facsimile('a');
@@ -40,6 +40,8 @@ test('Store can be a reference type', test => {
     server.store = value;
 
     test.deepEqual(client.store, value, 'Values are deeply equal');
+
+    consistent(server, client);
 });
 
 test('Store can be an array type', test => {
@@ -56,6 +58,8 @@ test('Store can be an array type', test => {
 
     test.deepEqual(client.store, value, 'Values are deeply equal');
     test.truthy(Array.isArray(client.store));
+
+    consistent(server, client);
 });
 
 test('Store can store nested references', test => {
@@ -72,7 +76,10 @@ test('Store can store nested references', test => {
     client.send = (... args) => server.receive(... args);
 
     server.store = value;
+
     test.deepEqual(client.store, value, 'Values are deeply equal');
+
+    consistent(server, client);
 });
 
 
@@ -95,6 +102,8 @@ test('Store can store circular references', test => {
     test.truthy(client.store.reference !== undefined, 'Reference was created');
     test.truthy(client.store.reference === client.store.reference.reference, 'Reference is circular');
     test.truthy(client.store.reference.reference.a === 999, 'Reference contains data');
+
+    consistent(server, client);
 });
 
 test('Sync rebuilds complex structures', test => {
@@ -117,6 +126,8 @@ test('Sync rebuilds complex structures', test => {
     client.sync();
 
     test.deepEqual(client.store, value, 'Values are deeply equal');
+
+    consistent(server, client);
 });
 
 test('Messaging is network transmissible', test => {
@@ -139,6 +150,8 @@ test('Messaging is network transmissible', test => {
     client.sync();
 
     test.deepEqual(client.store, value, 'Values are deeply equal');
+
+    consistent(server, client);
 });
 
 test('Can edit values inline', test => {
@@ -163,6 +176,8 @@ test('Can edit values inline', test => {
     server.store.b = 3;
 
     test.deepEqual(client.store, final, 'Values are deeply equal');
+
+    consistent(server, client);
 });
 
 test('Highest host wins', async test => {
@@ -174,13 +189,12 @@ test('Highest host wins', async test => {
     const client = new Facsimile('b');
 
     // Signal forwarding (same amount of time between)
-    server.send = (... args) => setTimeout(() => client.receive(... args), 0);
-    client.send = (... args) => setTimeout(() => server.receive(... args), 0);
+    const idle = link(server, client);
 
     // Mess with our store
     server.store = value;
 
-    await forTime(5);
+    await idle();
 
     test.deepEqual(client.store, value, 'Values are deeply equal');
 
@@ -188,10 +202,12 @@ test('Highest host wins', async test => {
     server.store.r = 100;
     client.store.r = 200;
 
-    await forTime(5);
+    await idle();
 
     test.truthy(server.store.r === client.store.r, 'Values should be the same');
     test.truthy(server.store.r === 200, 'Client should have won conflict');
+
+    consistent(server, client);
 });
 
 test('Object assign should work', async test => {
@@ -211,4 +227,6 @@ test('Object assign should work', async test => {
     // Mess with our store
     Object.assign(server.store, final);
     test.deepEqual(client.store, final, 'Values are deeply equal');
+
+    consistent(server, client);
 });

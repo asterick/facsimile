@@ -464,6 +464,14 @@ class Facsimile extends EventEmitter {
 
         const vectors = this._vectors.get(target);
 
+        // Trim array to match length
+        if (Array.isArray(target)) {
+            while (target.length > values.length) {
+                target.pop();
+                vectors.pop();
+            }
+        }
+
         // Flush previous instances
         for (let key of Object.keys(target)) {
             if (values[key] !== undefined) continue ;
@@ -583,6 +591,8 @@ class Facsimile extends EventEmitter {
     }
 
     deleteProperty (target, property) {
+        if (target[property] === undefined) return true;
+
         if (typeof target[property] === 'object') this._schedule_gc();
 
         const id = this._id.get(target);
@@ -606,7 +616,7 @@ class Facsimile extends EventEmitter {
 
     set (target, property, value, proxy) {
         // Unmodified value
-        if (target[property] === value) return ;
+        if (target[property] === value) return true;
 
         if (typeof target[property] === 'object') this._schedule_gc();
 

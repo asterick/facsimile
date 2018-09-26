@@ -16,10 +16,10 @@ test('Basic sort works', async test => {
     await idle();
 
     test.deepEqual(client.store, server.store, 'both arrays must match');
-    test.deepEqual(client.store, result, 'array must have sorted');
+    test.deepEqual(client.store, result, 'array has the proper values');
 });
 
-test('Unlocked objects should use replace', async test => {
+test('Unlocked objects should use replace (expanding)', async test => {
     const start = [1, 2, 3];
     const result = [1, 2, 3, 4];
 
@@ -28,21 +28,76 @@ test('Unlocked objects should use replace', async test => {
 
     let called = false;
 
+    let pending = 0;
     server.send = (msg, ... args) => {
         if (msg === 'call') called = true;
-        setTimeout(() => client.receive(msg, ... args), 0);
+        pending ++;
+        setTimeout(() => {
+            client.receive(msg, ... args);
+            pending--;
+        }, 0);
     };
 
-    client.send = (... args) => setTimeout(() => server.receive(... args), 0);
+    client.send = (... args) => {
+        pending ++;
+        setTimeout(() => {
+            server.receive(... args);
+            pending --;
+        }, 0);
+    };
 
     server.store = start;
     server.store.push(4);
 
-    await forTime(5);
+    do {
+        await forTime(1);
+    } while (pending > 0);
+
+    consistent(server, client);
 
     test.falsy(called, 'Used an replace call with a lock');
-    test.deepEqual(client.store, server.store, 'both arrays must match');
-    test.deepEqual(client.store, result, 'array must have sorted');
+    test.deepEqual(client.store, result, 'array has the proper values');
+});
+
+
+test('Unlocked objects should use replace (shrinking)', async test => {
+    const start = [1, 2, 3];
+    const result = [1, 2];
+
+    const server = new Facsimile('a');
+    const client = new Facsimile('b');
+
+    let called = false;
+
+    let pending = 0;
+    server.send = (msg, ... args) => {
+        if (msg === 'call') called = true;
+        pending ++;
+        setTimeout(() => {
+            client.receive(msg, ... args);
+            pending--;
+        }, 0);
+    };
+
+    client.send = (... args) => {
+        pending ++;
+        setTimeout(() => {
+            server.receive(... args);
+            pending --;
+        }, 0);
+    };
+
+    server.store = start;
+    server.store.pop();
+
+    do {
+        await forTime(1);
+    } while (pending > 0);
+
+    consistent(server, client);
+
+    test.falsy(called, 'Used an replace call with a lock');
+    test.deepEqual(client.store, result, 'array must have proper values');
 });
 
 test('Locking should use in-place modifies', async test => {

@@ -1,6 +1,7 @@
 # Facsimile
 
 [![Build Status](https://travis-ci.com/asterick/facsimile.svg?branch=master)](https://travis-ci.com/asterick/facsimile)
+[![Coverage Status](https://coveralls.io/repos/github/asterick/facsimile/badge.svg?branch=master)](https://coveralls.io/github/asterick/facsimile?branch=master)
 
 > Transparent object mirroring across process boundaries, with change monitoring
 

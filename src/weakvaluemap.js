@@ -6,9 +6,23 @@ class WeakValueMap extends Map {
     set(key, value) {
         if (!isRef(key)) {
             super.set(key, value);
-        } else {
-            super.set(new WeakRef(key), value);
+            return ;
         }
+
+        for (const refKey of super.keys()) {
+            if (isRef(refKey)) {
+                const deref = refKey.deref();
+
+                if (deref === key) {
+                    super.set(refKey, value);
+                    return ;
+                } else if (!deref) {
+                    super.delete(refKey);
+                }
+            }
+        }
+
+        super.set(new WeakRef(key), value);
     }
 
     get(key) {
@@ -16,8 +30,8 @@ class WeakValueMap extends Map {
             return super.get(key);
         }
 
-        for (let [refKey, value] of super.entries()) {
-            if (isRef(refkey)) {
+        for (const [refKey, value] of super.entries()) {
+            if (isRef(refKey)) {
                 const deref = refKey.deref();
 
                 if (deref === key) {
@@ -34,8 +48,8 @@ class WeakValueMap extends Map {
             return super.has(key);
         }
 
-        for (let [refKey, ] of super.entries()) {
-            if (isRef(refkey)) {
+        for (const refKey of super.keys()) {
+            if (isRef(refKey)) {
                 const deref = refKey.deref();
 
                 if (deref === key) {
@@ -55,7 +69,7 @@ class WeakValueMap extends Map {
             return ;
         }
 
-        for (let [refKey, ] of super.entries()) {
+        for (const refKey of super.keys()) {
             if (isRef(refKey)) {
                 const deref = refKey.deref();
 
@@ -72,7 +86,7 @@ class WeakValueMap extends Map {
     }
 
     *entries() {
-        for (let [refKey, value] of super.entries()) {
+        for (const [refKey, value] of super.entries()) {
             if (isRef(refKey)) {
                 const deref = refKey.deref();
 
@@ -87,18 +101,36 @@ class WeakValueMap extends Map {
         }
     }
 
-    keys() {
-        return super.keys().reduce((acc, refKey) => {
+    *keys() {
+        for (const refKey of super.keys()) {
             if (isRef(refKey)) {
                 const deref = refKey.deref();
 
-                if (deref) acc.push(deref);
+                if (deref) {
+                    yield deref;
+                } else {
+                    super.delete(refKey);
+                }
             } else {
-                acc.push(refKey);
+                yield refKey;
             }
+        }
+    }
 
-            return acc;
-        }, []);
+    forEach(callbackFn, that = null) {
+        for (const [refKey, value] of super.entries()) {
+            if (isRef(refKey)) {
+                const deref = refKey.deref();
+
+                if (deref) {
+                    callbackFn.call(that, value, deref, that);
+                } else {
+                    super.delete(refKey);
+                }
+            } else {
+                callbackFn.call(that, value, refKey, that);
+            }
+        }
     }
 }
 

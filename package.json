@@ -1,6 +1,6 @@
 {
   "name": "facsimile",
-  "version": "0.1.3",
+  "version": "1.0.0",
   "description": "Transparent object mirroring over RPC",
   "main": "src/index.js",
   "directories": {

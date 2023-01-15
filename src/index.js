@@ -31,11 +31,13 @@ class Facsimile {
         this._object_by_id.set(guid, object);
     }
 
-    locate(object) {
+    locate(object, requireRegistered = false) {
         const guid = this._id_by_object.get(object);
 
         if (guid) {
             return this._object_by_id.get(guid);
+        } else if (requireRegistered) {
+            throw new Error("Unregistered object discovered in call tree");
         }
 
         // Discovered a new object, we should register and serialize it
@@ -73,7 +75,7 @@ class Facsimile {
             ... rest
         };
 
-        // TODO:
+        console.log(output)
     }
 
     _receive (message) {

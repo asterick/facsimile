@@ -41,7 +41,7 @@ class ObjectReference {
     // Private members
     _increment(key) {
         const newVector = this._vectors[key][0] + 1 || 0;
-        this._vectors[key] = [new Vector, this._parent._hostname];
+        this._vectors[key] = [newVector, this._parent._hostname];
         return newVector;
     }
 
@@ -81,25 +81,45 @@ class ObjectReference {
     }
 
     // Proxy traps
-    getPrototypeOf () {
-        return Object.getPrototypeOf(this._storage);
+    getPrototypeOf (storage) {
+        return Object.getPrototypeOf(storage);
     }
 
     setPrototypeOf () {
         throw new Error("Cannot override prototypes of tracked objects")
     }
 
-    get (key) {
-        const value = this._storage[key];
+    get (storage, key, proxy) {
+        const value = storage[key];
         const that = this;
 
         if (typeof value === 'function') {
             return function (... rest) {
-                if (that._lock != that._parent._hostname) {
-                    throw new Error("Member functions my only be called on a locked object");
+                /* This is not operating on our proxy, simply apply it somewhere else */
+                if (this !== proxy) {
+                    return value.apply(this, rest);
                 }
 
-                throw new Error("Member calls are to be completed");
+                /* Verify that the relevant objects are locked */
+                if (that._lock !== that._parent._hostname) {
+                    //throw new Error("Member functions my only be called on a locked object");
+                }
+
+                for (const value of rest) {
+                    if (typeof value === 'object' && value !== null) {
+                        if (this.locate(value, true)._lock !== that._parent._hostname) {
+                            throw new Error("Member can only be called with locked objects");
+                        }
+                    }
+                }
+
+                value.apply(storage, rest);
+
+                if (RESET_CALLS.has(value)) {
+                    this._reset();
+                } else {
+                    that._send('call', key, { values: rest })
+                }
             }
         } else if (typeof value === 'object' && object !== null) {
             return this._parent.locate(value).proxy;
@@ -108,12 +128,13 @@ class ObjectReference {
         }
     }
 
-    set (key, value) {
+    set (storage, key, value, that) {
+        console.log(key, value);
         this._storage[key] = value;
         this._send('set', key, { value: this._parent.networkIdentity(value) });
     }
 
-    delete (key) {
+    deleteProperty (storage, key) {
         switch (typeof this._storage[key]) {
             case 'undefined':
             case 'function':

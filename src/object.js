@@ -3,21 +3,17 @@ const RESET_CALLS = new Set([
 ]);
 
 class ObjectReference {
-    constructor(parent, object, guid = ObjectReference.guid()) {
+    constructor(parent, object, guid = `${parent._hostname} ${crypto.randomUUID()}`) {
         this._guid = guid;
         this._vectors = {};
         this._parent = parent;
         this._storage = storage;
+        this._lock = null;
         this._proxy = new Proxy(this._storage, this);
 
         Object.freeze (this);
 
         parent.register(guid, this);
-    }
-
-    static guid() {
-        console.log("!!!");
-        return `${this._parent._hostname} ${crypto.randomUUID()}`
     }
 
     static as(parent, type, id) {
@@ -41,19 +37,45 @@ class ObjectReference {
     }
 
     // Private members
-    _send(op, key, args) {
-        const [index] = this._vectors[key] || [-1];
-        const vector = [index+1, this._parent._hostname];
-
-        this._parent.send({
-            op,
-            vector,
-            ... args
-        })
+    _increment(key) {
+        const newVector = this._vectors[key][0] + 1 || 0;
+        this._vectors[key] = [new Vector, this._parent._hostname];
+        return newVector;
     }
 
     _serialize () {
-        // TODO: Create a network safe copy of the stored value
+        if (Array.isArray(this._storage)) {
+            return this._storage.map((v) => this._parent.networkIdentity(v));
+        } else {
+            const result = {};
+            for (const [key, value] of this._storage) {
+                result[key] = this._parent.networkIdentity(value);
+            }
+            return result;
+        }
+    }
+
+    _reset () {
+        let vector = 0;
+
+        for (const [index] in this._vectors.values()) {
+            if (index > vector) vector = index;
+        }
+
+        this._parent._send('reset', {
+            guid: this._guid,
+            vector,
+            value: this._serialize()
+        });
+    }
+
+    _send (op, key, data) {
+        const vector = this._increment(key);
+        this._parent.send(op, { guid: this._guid, vector, key, ... data })
+    }
+
+    _receive (message) {
+        // TODO
     }
 
     // Proxy traps
@@ -69,15 +91,13 @@ class ObjectReference {
         const value = this._storage[key];
         const that = this;
 
-        if (RESET_CALLS.has(value)) {
+        if (typeof value === 'function') {
             return function (... rest) {
-                const ret = value.apply(this, rest);
-                this._parent.send('reset', key, this._serialize());
-            }
-        } if (typeof value === 'function') {
-            return function (... rest) {
-                const ret = value.apply(this, rest);
-                this._parent.send('reset', key, this._serialize());
+                if (that._lock != that._parent._hostname) {
+                    throw new Error("Member functions my only be called on a locked object");
+                }
+
+                throw new Error("Member calls are to be completed");
             }
         } else if (typeof value === 'object' && object !== null) {
             return this._parent.lookup(value);
@@ -87,7 +107,13 @@ class ObjectReference {
     }
 
     set (key, value) {
+        if (typeof value === 'object' && value !== null) {
+            this._storage[key] = this._parent.lookup(value);
+        } else {
+            this._storage[key] = value;
+        }
 
+        this._send('set', key, { value: this._parent.networkIdentity(value) });
     }
 
     delete (key) {
@@ -96,7 +122,7 @@ class ObjectReference {
             case 'function':
                 return ;
             default:
-                this._parent.send('delete', this._id, key);
+                this._parent.send('delete', key);
                 delete this._storage[key];
         }
     }

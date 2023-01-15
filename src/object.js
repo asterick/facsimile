@@ -1,5 +1,6 @@
 class ObjectReference {
-    constructor(parent, storage, guid = `${parent._hostname} ${crypto.randomUUID()}`) {
+    constructor(parent, storage, guid = crypto.randomUUID(), origin = parent._hostname) {
+        this._origin = origin;
         this._guid = guid;
         this._vectors = Array.isArray(storage) ? [] : {};
         this._parent = parent;
@@ -12,14 +13,14 @@ class ObjectReference {
             this._vectors[key] = [0n, parent._hostname];
         }
 
-        parent.register(guid, this);
+        parent.register(this.name, this);
     }
 
-    static as(parent, type, id) {
-        return new ObjectReference(parent, new type, id);
+    static as(parent, type, guid, origin) {
+        return new ObjectReference(parent, new type, guid, origin);
     }
 
-    static from(parent, object, id) {
+    static from(parent, object, guid, origin) {
         if (typeof object !== 'object' || object === null) {
             return object;
         } else if (Object.getPrototypeOf(object) !== Array.prototype &&
@@ -27,7 +28,11 @@ class ObjectReference {
             throw new Error("Can only coerse basic objects and arrays to object reference");
         }
 
-        return new ObjectReference(parent, object, id);
+        return new ObjectReference(parent, object, guid, origin);
+    }
+
+    get name() {
+        return `${this._origin}:${this._guid}`
     }
 
     get proxy() {
@@ -35,7 +40,7 @@ class ObjectReference {
     }
 
     // Private members
-    _networkBody() {
+    _serialize () {
         if (Array.isArray(this._storage)) {
             return this._storage.map((v) => this._parent.id(v));
         } else {
@@ -47,18 +52,8 @@ class ObjectReference {
         }
     }
 
-    _serialize () {
-        let data;
-
-        return {
-            guid: this._guid,
-            vectors: this._vectors,
-            data: this._networkBody()
-        }
-    }
-
     _send (op, data) {
-        this._parent._send(op, { guid: this._guid, ... data })
+        this._parent._send(op, { target: this.name, ... data })
     }
 
     _receive (message) {
@@ -125,12 +120,12 @@ class ObjectReference {
                 }
 
                 if (requireReset) {
-                    that._send('replace', { key, values: that._networkBody() });
+                    that._send('replace', { data: that._serialize() });
                 } else if (Object.getPrototypeOf(storage)[key] === value) {
                     that._send('call', { key, values: rest })
                 }
             }
-        } else if (typeof value === 'object' && object !== null) {
+        } else if (typeof value === 'object' && value !== null) {
             return this._parent.locate(value).proxy;
         } else {
             return value;

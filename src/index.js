@@ -11,6 +11,7 @@ class Facsimile {
         this._hostname = hostname;
         this._top = null;
         this._topVector = [0n, this._hostname];
+        this._consumers = [];
 
         this._id_by_object = new WeakMap();
         this._object_by_id = new WeakValueMap();
@@ -18,10 +19,15 @@ class Facsimile {
         Object.seal(this);
     }
 
+    addConsumer(consumer) {
+        consumer.send({ op: 'hello', ... this._serialize() });
+        this._consumers.push(consumer);
+    }
+
     register(guid, object) {
         // Newly discovered object
         if (this._object_by_id.get(guid) !== this) {
-            this._send('new', { guid, type: Array.isArray(object._storage) ? 'array' : 'object' });
+            this._send('new', { guid, type: Array.isArray(object._storage) ? [] : {} });
         }
 
         // Lookup by Proxy, it's host container and it's underlying storage
@@ -44,13 +50,13 @@ class Facsimile {
 
         // Discovered a new object, we should register and serialize it
         const ref = ObjectReference.from(this, object);
-        this._send('init', ref._serialize());
+        this._send('init', { guid: ref._guid, data: ref._serialize() });
         return ref;
     }
 
     id(value) {
         if (typeof value === 'object' && value !== null) {
-            return [ this.locate(value)._guid ]
+            return [ this.locate(value).name ]
         } else {
             return value;
         }
@@ -91,8 +97,9 @@ class Facsimile {
 
             if (result[key]) continue ;
 
-            const { vectors, data } = this._object_by_id.get(key)._serialize();
-            result[key] = { vectors, data };
+            const ref = this._object_by_id.get(key);
+            const data = ref._serialize();
+            result[key] = { vectors: ref._vectors, data };
 
             keys.push(... Object.values(data));
         }
@@ -102,24 +109,32 @@ class Facsimile {
 
     // Private members
     _send (op, rest) {
-        const output = {
+        const message = {
             op,
             hostname: this._hostname,
             ... rest
         };
 
-        console.log(output)
-        // TODO: SEND TO CONSUMERS
+        for (const consumer of this._consumers) {
+            consumer.send(message);
+        }
+
+        console.log(message);
     }
 
-    _receive (message) {
-        // TODO:
+    _receive (message, source) {
         if (message.guid) {
-            const obj = this._object_by_id.get(message.guid)
+            const obj = this._object_by_id.get(message.target)
 
             if (obj._receive(message)) {
-                // FORWARD TO OTHER CONSUMERS
+                for (const consumer of this._consumers) {
+                    if (consumer !== source) {
+                        consumer.send(message);
+                    }
+                }
             }
+
+            return ;
         }
 
         switch (message.op) {

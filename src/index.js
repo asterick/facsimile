@@ -48,7 +48,7 @@ class Facsimile {
         return ref;
     }
 
-    networkIdentity(value) {
+    id(value) {
         if (typeof value === 'object' && value !== null) {
             return [ this.locate(value)._guid ]
         } else {
@@ -74,11 +74,11 @@ class Facsimile {
         this._topVector = [ this._topVector[0] + 1n, this._hostname ];
 
         this._top = value;
-        this._send('root', { vector: this._topVector, value: this.networkIdentity(value) });
+        this._send('root', { vector: this._topVector, value: this.id(value) });
     }
 
     _serialize() {
-        const root = { vector: this._topVector, value: this.networkIdentity(this._top) };
+        const root = { vector: this._topVector, value: this.id(this._top) };
         const result = { root }
         const keys = [ ... this.allReferences([ root.value ]) ]
 

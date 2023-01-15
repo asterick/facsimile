@@ -1,7 +1,3 @@
-const RESET_CALLS = new Set([
-    Array.prototype.sort
-]);
-
 class ObjectReference {
     constructor(parent, storage, guid = `${parent._hostname} ${crypto.randomUUID()}`) {
         this._guid = guid;
@@ -41,11 +37,11 @@ class ObjectReference {
     // Private members
     _networkBody() {
         if (Array.isArray(this._storage)) {
-            return this._storage.map((v) => this._parent.networkIdentity(v));
+            return this._storage.map((v) => this._parent.id(v));
         } else {
             const data = {};
             for (const [key, value] of Object.entries(this._storage)) {
-                data[key] = this._parent.networkIdentity(value);
+                data[key] = this._parent.id(value);
             }
             return data;
         }
@@ -80,14 +76,6 @@ class ObjectReference {
         return this._vectors[key] = [id, this._parent._hostname];
     }
 
-    _maxVector () {
-        let maxVector = -1n;
-        for (const [vector, ] of Object.values(this._vectors)) {
-            if (vector > maxVector) maxVector = vector;
-        }
-        return maxVector;
-    }
-
     // Proxy traps
     getPrototypeOf (storage) {
         return Object.getPrototypeOf(storage);
@@ -104,6 +92,8 @@ class ObjectReference {
             const that = this;
 
             return function (... rest) {
+                let requireReset = false;
+
                 /* This is not operating on our proxy, simply apply it somewhere else */
                 if (this !== proxy) {
                     return value.apply(this, rest);
@@ -119,21 +109,29 @@ class ObjectReference {
                         if (this.locate(value, true)._lock !== that._parent._hostname) {
                             throw new Error("Member can only be called with locked objects");
                         }
+                    } else if (typeof value === 'function') {
+                        requireReset = true;
                     }
                 }
 
-
+                // Apply function to our object
                 value.apply(storage, rest);
-                const vector = [that._maxVector(), that._parent._hostname];
+
+                //
+                let maxVector = -1n;
+                for (const [vector, ] of Object.values(that._vectors)) {
+                    if (vector > maxVector) maxVector = vector;
+                }
+                const vector = [maxVector, that._parent._hostname];
 
                 that._vectors = Array.isArray(storage) ? [] : {}
                 for (const key in Object.keys(storage)) {
                     that._vectors[key] = vector;
                 }
 
-                if (RESET_CALLS.has(value)) {
+                if (requireReset) {
                     that._send('replace', { key, vector, values: that._networkBody() });
-                } else {
+                } else if (Object.getPrototypeOf(storage)[key] === value) {
                     that._send('call', { key, values: rest })
                 }
             }
@@ -147,10 +145,16 @@ class ObjectReference {
     set (storage, key, value, that) {
         if (value === this._storage[key]) return ;
 
-        this._storage[key] = value;
+        if (typeof value === "object" && object !== null) {
+            const obj = this._parent.locate(value);
+
+            this._storage[key] = obj._storage;
+        } else {
+            this._storage[key] = value;
+        }
 
         if (typeof value !== 'function') {
-            this._send('set', { vector: this._increment(key), value: this._parent.networkIdentity(value) });
+            this._send('set', { vector: this._increment(key), value: this._parent.id(value) });
         }
     }
 

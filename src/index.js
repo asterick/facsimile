@@ -9,6 +9,7 @@ class Facsimile {
 
         this._hostname = hostname;
         this._top = null;
+        this._topVector = [0n, this._hostname];
 
         this._id_by_object = new WeakMap();
         this._object_by_id = new WeakValueMap();
@@ -19,7 +20,7 @@ class Facsimile {
     register(guid, object) {
         // Newly discovered object
         if (this._object_by_id.get(guid) !== this) {
-            this._send('new', { guid, type: Array.isArray(object._storage) ? 'array' : 'object'});
+            this._send('new', { guid, type: Array.isArray(object._storage) ? 'array' : 'object' });
         }
 
         // Lookup by Proxy, it's host container and it's underlying storage
@@ -42,7 +43,7 @@ class Facsimile {
 
         // Discovered a new object, we should register and serialize it
         const ref = ObjectReference.from(this, object);
-        ref._reset();
+        this._send('init', ref._serialize());
         return ref;
     }
 
@@ -63,8 +64,10 @@ class Facsimile {
     }
 
     set state(value) {
+        this._topVector = [ this._topVector[0] + 1n, this._hostname ];
+
         this._top = value;
-        this._send('root', { value: this.networkIdentity(value) });
+        this._send('root', { vector: this._topVector, value: this.networkIdentity(value) });
     }
 
     // Private members
@@ -79,13 +82,21 @@ class Facsimile {
     }
 
     _receive (message) {
-        if (message.guid) {
-            // TODO: Handle objects with which I do not know
-            // Should never happen if we sync first thing
+        // TODO:
 
-            this._object_by_id.get(message.guid)._receive(message);
+        if (message.guid) {
+            const obj = this._object_by_id.get(message.guid)
+
+            if (obj._receive(message)) {
+                // FORWARD TO OTHER CONSUMERS
+            } else {
+                // SYNC WITH
+            }
         }
 
+        switch (message.op) {
+
+        }
         // TODO
     }
 }

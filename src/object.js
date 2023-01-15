@@ -10,7 +10,7 @@ class ObjectReference {
         this._storage = storage;
         this._lock = null;
         this._proxy = new Proxy(this._storage, this);
-        Object.freeze (this);
+        Object.seal (this);
 
         for (const key of Object.keys(storage)) {
             this._vectors[key] = [0, parent._hostname];
@@ -39,45 +39,53 @@ class ObjectReference {
     }
 
     // Private members
-    _increment(key) {
-        const newVector = this._vectors[key][0] + 1 || 0;
-        this._vectors[key] = [newVector, this._parent._hostname];
-        return newVector;
-    }
-
-    _serialize () {
+    _networkBody() {
         if (Array.isArray(this._storage)) {
             return this._storage.map((v) => this._parent.networkIdentity(v));
         } else {
-            const result = {};
+            const data = {};
             for (const [key, value] of Object.entries(this._storage)) {
-                result[key] = this._parent.networkIdentity(value);
+                data[key] = this._parent.networkIdentity(value);
             }
-            return result;
+            return data;
         }
     }
 
-    _reset () {
-        let vector = 0;
+    _serialize () {
+        let data;
 
-        for (const [index] in Object.values(this._vectors)) {
-            if (index > vector) vector = index;
-        }
-
-        this._parent._send('init', {
+        return {
             guid: this._guid,
-            vector,
-            value: this._serialize()
-        });
+            vectors: this._vectors,
+            data: this._networkBody()
+        }
     }
 
-    _send (op, key, data) {
-        const vector = this._increment(key);
-        this._parent._send(op, { guid: this._guid, vector, key, ... data })
+    _send (op, data) {
+        this._parent._send(op, { guid: this._guid, ... data })
     }
 
     _receive (message) {
         // TODO
+    }
+
+    _increment (key) {
+        let id;
+        if (this._vectors[key]) {
+            id = this._vectors[key][0] + 1n;
+        } else {
+            id = 0n;
+        }
+
+        return this._vectors[key] = [id, this._parent._hostname];
+    }
+
+    _maxVector () {
+        let maxVector = -1n;
+        for (const [vector, ] of Object.values(this._vectors)) {
+            if (vector > maxVector) maxVector = vector;
+        }
+        return maxVector;
     }
 
     // Proxy traps
@@ -91,9 +99,10 @@ class ObjectReference {
 
     get (storage, key, proxy) {
         const value = storage[key];
-        const that = this;
 
         if (typeof value === 'function') {
+            const that = this;
+
             return function (... rest) {
                 /* This is not operating on our proxy, simply apply it somewhere else */
                 if (this !== proxy) {
@@ -113,12 +122,19 @@ class ObjectReference {
                     }
                 }
 
+
                 value.apply(storage, rest);
+                const vector = [that._maxVector(), that._parent._hostname];
+
+                that._vectors = Array.isArray(storage) ? [] : {}
+                for (const key in Object.keys(storage)) {
+                    that._vectors[key] = vector;
+                }
 
                 if (RESET_CALLS.has(value)) {
-                    this._reset();
+                    that._send('replace', { key, vector, values: that._networkBody() });
                 } else {
-                    that._send('call', key, { values: rest })
+                    that._send('call', { key, values: rest })
                 }
             }
         } else if (typeof value === 'object' && object !== null) {
@@ -129,9 +145,8 @@ class ObjectReference {
     }
 
     set (storage, key, value, that) {
-        console.log(key, value);
         this._storage[key] = value;
-        this._send('set', key, { value: this._parent.networkIdentity(value) });
+        this._send('set', { vector: this._increment(key), value: this._parent.networkIdentity(value) });
     }
 
     deleteProperty (storage, key) {
@@ -140,7 +155,7 @@ class ObjectReference {
             case 'function':
                 return ;
             default:
-                this._send('delete', key);
+                this._send('delete', { vector: this._increment(key), key });
                 delete this._storage[key];
         }
     }

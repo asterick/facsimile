@@ -117,20 +117,15 @@ class ObjectReference {
                 // Apply function to our object
                 value.apply(storage, rest);
 
-                //
-                let maxVector = -1n;
-                for (const [vector, ] of Object.values(that._vectors)) {
-                    if (vector > maxVector) maxVector = vector;
-                }
-                const vector = [maxVector, that._parent._hostname];
-
+                // Since our array is locked, we will simply reset everything to zero as there cannot be contentions
+                const vector = [0n, that._parent._hostname];
                 that._vectors = Array.isArray(storage) ? [] : {}
                 for (const key in Object.keys(storage)) {
                     that._vectors[key] = vector;
                 }
 
                 if (requireReset) {
-                    that._send('replace', { key, vector, values: that._networkBody() });
+                    that._send('replace', { key, values: that._networkBody() });
                 } else if (Object.getPrototypeOf(storage)[key] === value) {
                     that._send('call', { key, values: rest })
                 }

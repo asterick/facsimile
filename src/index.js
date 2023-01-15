@@ -56,7 +56,7 @@ class Facsimile {
         }
     }
 
-    *allReferences(values) {
+    *guids(values) {
         for (const value of Object.values(values)) {
             if (Array.isArray(value)) yield value;
         }
@@ -79,19 +79,22 @@ class Facsimile {
 
     _serialize() {
         const root = { vector: this._topVector, value: this.id(this._top) };
+        const keys = [ root.value ];
         const result = { root }
-        const keys = [ ... this.allReferences([ root.value ]) ]
 
         while (keys.length > 0) {
-            const [ key ] = keys.pop();
+            const next = keys.pop();
+
+            if (!Array.isArray(next)) continue ;
+
+            const [ key ] = next;
 
             if (result[key]) continue ;
 
-            const body = this._object_by_id.get(key)._serialize();
-            result[key] = body;
-            delete body.guid;
+            const { vectors, data } = this._object_by_id.get(key)._serialize();
+            result[key] = { vectors, data };
 
-            keys.push(... this.allReferences(body.data));
+            keys.push(... Object.values(data));
         }
 
         return result;

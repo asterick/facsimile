@@ -4,81 +4,44 @@ function isRef(ref) {
 
 class WeakValueMap extends Map {
     set(key, value) {
-        if (!isRef(key)) {
-            super.set(key, value);
-            return ;
+        if (isRef(value)) {
+            value = new WeakRef(value);
         }
 
-        for (const refKey of super.keys()) {
-            if (isRef(refKey)) {
-                const deref = refKey.deref();
-
-                if (deref === key) {
-                    super.set(refKey, value);
-                    return ;
-                } else if (!deref) {
-                    super.delete(refKey);
-                }
-            }
-        }
-
-        super.set(new WeakRef(key), value);
+        return super.set(key, value);
     }
 
     get(key) {
-        if (!isRef(key)) {
-            return super.get(key);
+        const value = super.get(key);
+
+        if (!isRef(value)) {
+            return value;
         }
 
-        for (const [refKey, value] of super.entries()) {
-            if (isRef(refKey)) {
-                const deref = refKey.deref();
+        const deref = value.deref();
 
-                if (deref === key) {
-                    return value;
-                } else if (!deref) {
-                    super.delete(deref);
-                }
-            }
+        if (deref) {
+            return deref;
+        } else if (!deref) {
+            super.delete(key);
         }
     }
 
     has(key) {
-        if (!isRef(key)) {
+        const value = super.get(key);
+
+        if (!isRef(value)) {
             return super.has(key);
         }
 
-        for (const refKey of super.keys()) {
-            if (isRef(refKey)) {
-                const deref = refKey.deref();
+        const deref = value.deref();
 
-                if (deref === key) {
-                    return true;
-                } else if (!deref) {
-                    super.delete(deref);
-                }
-            }
-        }
-
-        return false;
-    }
-
-    delete(key) {
-        if (!isRef(key)) {
+        if (!deref) {
             super.delete(key);
-            return ;
+            return false;
         }
 
-        for (const refKey of super.keys()) {
-            if (isRef(refKey)) {
-                const deref = refKey.deref();
-
-                if (deref === key || !deref) {
-                    super.delete(refKey);
-                    return ;
-                }
-            }
-        }
+        return true;
     }
 
     [Symbol.iterator]() {
@@ -86,50 +49,30 @@ class WeakValueMap extends Map {
     }
 
     *entries() {
-        for (const [refKey, value] of super.entries()) {
-            if (isRef(refKey)) {
-                const deref = refKey.deref();
+        for (const [key, refValue] of super.entries()) {
+            if (isRef(refValue)) {
+                const deref = refValue.deref();
 
                 if (deref) {
-                    yield [deref, value];
+                    yield [key, deref];
                 } else {
-                    super.delete(refKey);
+                    super.delete(key);
                 }
             } else {
-                yield [refKey, value];
+                yield [key, refValue];
             }
         }
     }
 
-    *keys() {
-        for (const refKey of super.keys()) {
-            if (isRef(refKey)) {
-                const deref = refKey.deref();
-
-                if (deref) {
-                    yield deref;
-                } else {
-                    super.delete(refKey);
-                }
-            } else {
-                yield refKey;
-            }
+    *values() {
+        for (const [key, value] of this) {
+            yield value;
         }
     }
 
     forEach(callbackFn, that = null) {
-        for (const [refKey, value] of super.entries()) {
-            if (isRef(refKey)) {
-                const deref = refKey.deref();
-
-                if (deref) {
-                    callbackFn.call(that, value, deref, that);
-                } else {
-                    super.delete(refKey);
-                }
-            } else {
-                callbackFn.call(that, value, refKey, that);
-            }
+        for (const [key, value] of this) {
+            callbackFn.call(that, value, key, this);
         }
     }
 }

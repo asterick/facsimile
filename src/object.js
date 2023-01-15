@@ -3,15 +3,18 @@ const RESET_CALLS = new Set([
 ]);
 
 class ObjectReference {
-    constructor(parent, object, guid = `${parent._hostname} ${crypto.randomUUID()}`) {
+    constructor(parent, storage, guid = `${parent._hostname} ${crypto.randomUUID()}`) {
         this._guid = guid;
-        this._vectors = {};
+        this._vectors = Array.isArray(storage) ? [] : {};
         this._parent = parent;
         this._storage = storage;
         this._lock = null;
         this._proxy = new Proxy(this._storage, this);
-
         Object.freeze (this);
+
+        for (const key of Object.keys(storage)) {
+            this._vectors[key] = [0, parent._hostname];
+        }
 
         parent.register(guid, this);
     }
@@ -21,11 +24,10 @@ class ObjectReference {
     }
 
     static from(parent, object, id) {
-        if (typeof object !== 'object') {
+        if (typeof object !== 'object' || object === null) {
             return object;
-        } if (Array.isArray(object) && Object.getPrototypeOf(object) !== Array.prototype) {
-            throw new Error("Cannot coerse sub-classed array into a tracked object reference");
-        } else if (Object.getPrototypeOf(object) !== Object.prototype) {
+        } else if (Object.getPrototypeOf(object) !== Array.prototype &&
+            Object.getPrototypeOf(object) !== Object.prototype) {
             throw new Error("Can only coerse basic objects and arrays to object reference");
         }
 
@@ -48,7 +50,7 @@ class ObjectReference {
             return this._storage.map((v) => this._parent.networkIdentity(v));
         } else {
             const result = {};
-            for (const [key, value] of this._storage) {
+            for (const [key, value] of Object.entries(this._storage)) {
                 result[key] = this._parent.networkIdentity(value);
             }
             return result;
@@ -58,11 +60,11 @@ class ObjectReference {
     _reset () {
         let vector = 0;
 
-        for (const [index] in this._vectors.values()) {
+        for (const [index] in Object.values(this._vectors)) {
             if (index > vector) vector = index;
         }
 
-        this._parent._send('reset', {
+        this._parent._send('init', {
             guid: this._guid,
             vector,
             value: this._serialize()
@@ -71,7 +73,7 @@ class ObjectReference {
 
     _send (op, key, data) {
         const vector = this._increment(key);
-        this._parent.send(op, { guid: this._guid, vector, key, ... data })
+        this._parent._send(op, { guid: this._guid, vector, key, ... data })
     }
 
     _receive (message) {
@@ -80,7 +82,7 @@ class ObjectReference {
 
     // Proxy traps
     getPrototypeOf () {
-        return Object.getPrototypeOf(this._storage)
+        return Object.getPrototypeOf(this._storage);
     }
 
     setPrototypeOf () {
@@ -100,19 +102,14 @@ class ObjectReference {
                 throw new Error("Member calls are to be completed");
             }
         } else if (typeof value === 'object' && object !== null) {
-            return this._parent.lookup(value);
+            return this._parent.locate(value).proxy;
         } else {
             return value;
         }
     }
 
     set (key, value) {
-        if (typeof value === 'object' && value !== null) {
-            this._storage[key] = this._parent.lookup(value);
-        } else {
-            this._storage[key] = value;
-        }
-
+        this._storage[key] = value;
         this._send('set', key, { value: this._parent.networkIdentity(value) });
     }
 
@@ -122,7 +119,7 @@ class ObjectReference {
             case 'function':
                 return ;
             default:
-                this._parent.send('delete', key);
+                this._send('delete', key);
                 delete this._storage[key];
         }
     }

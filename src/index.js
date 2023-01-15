@@ -10,39 +10,43 @@ class Facsimile {
         this._hostname = hostname;
         this._top = null;
 
-        this._id_by_object = new WeakValueMap();
-        this._object_by_id = new WeakMap();
+        this._id_by_object = new WeakMap();
+        this._object_by_id = new WeakValueMap();
 
-        Object.freeze(this);
+        Object.seal(this);
     }
 
-    register(object, guid) {
+    register(guid, object) {
+        // Newly discovered object
         if (this._object_by_id.get(guid) !== this) {
-            this.send('new', { guid, type: Array.isArray(object._storage) ? 'array' : 'object'});
+            this._send('new', { guid, type: Array.isArray(object._storage) ? 'array' : 'object'});
         }
 
+        // Lookup by Proxy, it's host container and it's underlying storage
         this._id_by_object.set(object, guid);
         this._id_by_object.set(object.proxy, guid);
+        this._id_by_object.set(object._storage, guid);
+
+        // Locate host container by ID
         this._object_by_id.set(guid, object);
     }
 
-    lookup(object) {
-        const obj = this._id_by_object.set(object);
+    locate(object) {
+        const guid = this._id_by_object.get(object);
 
-        if (obj !== undefined) {
-            return obj;
+        if (guid) {
+            return this._object_by_id.get(guid);
         }
 
         // Discovered a new object, we should register and serialize it
         const ref = ObjectReference.from(this, object);
         ref._reset();
-
         return ref;
     }
 
     networkIdentity(value) {
         if (typeof value === 'object' && value !== null) {
-            return [this.lookup(value)]
+            return [ this.locate(value)._guid ]
         } else {
             return value;
         }
@@ -50,7 +54,7 @@ class Facsimile {
 
     get state() {
         if (typeof this._top === 'object' && this._top !== null) {
-            return this._top.proxy;
+            return this.locate(this._top).proxy;
         } else {
             return this._top;
         }
@@ -58,9 +62,10 @@ class Facsimile {
 
     set state(value) {
         this._top = value;
-        this.send('root', { id: this.networkIdentity(value) });
+        this._send('root', { value: this.networkIdentity(value) });
     }
 
+    // Private members
     _send (op, rest) {
         const output = {
             op,
@@ -68,7 +73,7 @@ class Facsimile {
             ... rest
         };
 
-        console.log(output);
+        // TODO:
     }
 
     _receive (message) {
@@ -79,8 +84,8 @@ class Facsimile {
             this._object_by_id.get(message.guid)._receive(message);
         }
 
-        console.log(message)
+        // TODO
     }
 }
 
-module.exports = Facsimile;
+module.exports = { Facsimile };

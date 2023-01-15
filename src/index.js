@@ -7,6 +7,7 @@ class Facsimile {
             throw new Error("Hostname may not contain spaces or lower ASCII characters");
         }
 
+        this._initialized = false;
         this._hostname = hostname;
         this._top = null;
         this._topVector = [0n, this._hostname];
@@ -55,6 +56,12 @@ class Facsimile {
         }
     }
 
+    *allReferences(values) {
+        for (const value of Object.values(values)) {
+            if (Array.isArray(value)) yield value;
+        }
+    }
+
     get state() {
         if (typeof this._top === 'object' && this._top !== null) {
             return this.locate(this._top).proxy;
@@ -70,6 +77,26 @@ class Facsimile {
         this._send('root', { vector: this._topVector, value: this.networkIdentity(value) });
     }
 
+    _serialize() {
+        const root = { vector: this._topVector, value: this.networkIdentity(this._top) };
+        const result = { root }
+        const keys = [ ... this.allReferences([ root.value ]) ]
+
+        while (keys.length > 0) {
+            const [ key ] = keys.pop();
+
+            if (result[key]) continue ;
+
+            const body = this._object_by_id.get(key)._serialize();
+            result[key] = body;
+            delete body.guid;
+
+            keys.push(... this.allReferences(body.data));
+        }
+
+        return result;
+    }
+
     // Private members
     _send (op, rest) {
         const output = {
@@ -79,25 +106,22 @@ class Facsimile {
         };
 
         console.log(output)
+        // TODO: SEND TO CONSUMERS
     }
 
     _receive (message) {
         // TODO:
-
         if (message.guid) {
             const obj = this._object_by_id.get(message.guid)
 
             if (obj._receive(message)) {
                 // FORWARD TO OTHER CONSUMERS
-            } else {
-                // SYNC WITH
             }
         }
 
         switch (message.op) {
 
         }
-        // TODO
     }
 }
 

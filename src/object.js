@@ -13,7 +13,7 @@ class ObjectReference {
         Object.seal (this);
 
         for (const key of Object.keys(storage)) {
-            this._vectors[key] = [0, parent._hostname];
+            this._vectors[key] = [0n, parent._hostname];
         }
 
         parent.register(guid, this);
@@ -145,8 +145,13 @@ class ObjectReference {
     }
 
     set (storage, key, value, that) {
+        if (value === this._storage[key]) return ;
+
         this._storage[key] = value;
-        this._send('set', { vector: this._increment(key), value: this._parent.networkIdentity(value) });
+
+        if (typeof value !== 'function') {
+            this._send('set', { vector: this._increment(key), value: this._parent.networkIdentity(value) });
+        }
     }
 
     deleteProperty (storage, key) {
